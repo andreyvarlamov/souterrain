@@ -12,7 +12,7 @@ set srcdir=%rootdir%src
 set copt=/IC:\dev\shared\include /MDd /LDd /Z7 /Od /Oi /FC /GR- /nologo /Ob1
 set cwopt=/WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4127
 set llib=SDL2_mixer.lib SDL2.lib glad-dll.lib SDL2_image.lib SDL2_ttf.lib winmm.lib
-set lopt=/libpath:%libsdir% /debug /opt:ref /incremental:no
+set lopt=/libpath:%libsdir% /debug /opt:ref /incremental:no /noexp
 
 pushd %bindir%
 

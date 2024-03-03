@@ -15,7 +15,7 @@ set cwopt=/WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4127
 
 set lopt=/libpath:%libsdir% /debug /opt:ref /incremental:no /subsystem:console
 
-set llib=sav_lib.lib
+set llib=sav_lib.lib sou_templates.lib
 
 pushd %bindir%
 
