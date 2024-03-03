@@ -16,8 +16,6 @@
 
 #include <cstdio>
 
-enum { DARKNESS_UNSEEN = 255, DARKNESS_SEEN = 180, DARKNESS_IN_VIEW = 0 };
-
 #include "sou_world.cpp"
 
 sav_texture
@@ -392,139 +390,6 @@ DrawEntities(game_state *GameState)
     EndDraw();
 }
 
-b32
-LookAround(entity *Entity, world *World)
-{
-    return EntityExists(World->PlayerEntity) && IsInLineOfSight(World, Entity->Pos, World->PlayerEntity->Pos, Entity->ViewRange);
-}
-
-void
-UpdateNpcState(game_state *GameState, world *World, entity *Entity)
-{
-    // NOTE: Pre-update
-    switch (Entity->NpcState)
-    {
-        case NPC_STATE_IDLE:
-        {
-            if (LookAround(Entity, World))
-            {
-                Entity->NpcState = NPC_STATE_HUNTING;
-                TraceLog("%s (%d): player is in FOV. Now hunting player", Entity->Name, Entity->DebugID);
-            }
-        } break;
-
-        case NPC_STATE_HUNTING:
-        {
-            if (!LookAround(Entity, World))
-            {
-                // NOTE: The player position here is already the position that the entity hasn't seen,
-                //       but to help with bad fov around corners, give entity one turn of "clairvoyance".
-                // TODO: Only update target here if the new player pos is within a certain radius, or in los of the old target
-                //       to prevent following the player if he teleported
-                Entity->Target = World->PlayerEntity->Pos;
-
-                Entity->NpcState = NPC_STATE_SEARCHING;
-                TraceLog("%s (%d): player is missing. Searching where last seen: (%d, %d)", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
-            }
-            else
-            {
-                Entity->Target = World->PlayerEntity->Pos;
-            }
-            
-        } break;
-
-        case NPC_STATE_SEARCHING:
-        {
-            if (LookAround(Entity, World))
-            {
-                Entity->NpcState = NPC_STATE_HUNTING;
-                TraceLog("%s (%d): found player. Now hunting player", Entity->Name, Entity->DebugID);
-            }
-            else if (Entity->Pos == Entity->Target)
-            {
-                Entity->NpcState = NPC_STATE_IDLE;
-                TraceLog("%s (%d): no player in last known location. Now idle", Entity->Name, Entity->DebugID);
-            }
-        } break;
-
-        default:
-        {
-            InvalidCodePath;
-        } break;
-    }
-
-    // NOTE: Update
-    switch (Entity->NpcState)
-    {
-        case NPC_STATE_IDLE:
-        {
-            int ShouldMove = GetRandomValue(0, 12);
-            if (ShouldMove >= 6)
-            {
-                int RandDir = GetRandomValue(0, 4);
-                vec2i NewEntityP = Entity->Pos;
-                switch (RandDir) {
-                    case 0: {
-                        NewEntityP += Vec2I(0, -1);
-                    } break;
-                    case 1:
-                    {
-                        NewEntityP += Vec2I(1, 0);
-                    } break;
-                    case 2:
-                    {
-                        NewEntityP += Vec2I(0, 1);
-                    } break;
-                    case 3:
-                    {
-                        NewEntityP += Vec2I(-1, 0);
-                    } break;
-                    default: break;
-                }
-
-                b32 TurnUsed;
-                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
-            }
-        } break;
-
-        case NPC_STATE_HUNTING:
-        {
-            Entity->Target = World->PlayerEntity->Pos;
-            path_result Path = CalculatePath(World,
-                                             Entity->Pos, World->PlayerEntity->Pos,
-                                             &GameState->TrArenaA, &GameState->TrArenaB,
-                                             0);
-            
-            if (Path.FoundPath && Path.Path)
-            {
-                vec2i NewEntityP = Path.Path[0];
-                b32 TurnUsed;
-                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
-            }
-        } break;
-
-        case NPC_STATE_SEARCHING:
-        {
-            path_result Path = CalculatePath(World,
-                                             Entity->Pos, Entity->Target,
-                                             &GameState->TrArenaA, &GameState->TrArenaB,
-                                             0);
-            
-            if (Path.FoundPath && Path.Path)
-            {
-                vec2i NewEntityP = Path.Path[0];
-                b32 TurnUsed;
-                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
-            }
-        } break;
-
-        default:
-        {
-            InvalidCodePath;
-        } break;
-    }
-}
-
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
 {
@@ -647,6 +512,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     MemoryArena_Reset(&GameState->TrArenaA);
 
     world *World = &GameState->World;
+    entity *Player = World->PlayerEntity;
 
     if (WindowSizeChanged())
     {
@@ -795,8 +661,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
     vec2 MouseP = GetMousePos();
     vec2 MouseWorldPxP = CameraScreenToWorld(&GameState->Camera, MouseP);
-    vec2i MouseTileP = GetTilePFromPxP(&GameState->World, MouseWorldPxP);
-    entity *HighlightedEntity = GetEntitiesAt(&GameState->World, MouseTileP);
+    vec2i MouseTileP = GetTilePFromPxP(World, MouseWorldPxP);
+    entity *HighlightedEntity = IsInFOV(World, Player->FieldOfView, MouseTileP) ? GetEntitiesAt(World, MouseTileP) : NULL;
  
     // SECTION: RENDER
     // NOTE: Draw debug overlay
@@ -806,11 +672,11 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         if (HighlightedEntity != NULL && HighlightedEntity->FieldOfView)
         {
-            for (int i = 0; i < GameState->World.Width * GameState->World.Width; i++)
+            for (int i = 0; i < World->Width * World->Width; i++)
             {
                 if (HighlightedEntity->FieldOfView[i] == 1)
                 {
-                    DrawRect(&GameState->World, IdxToXY(i, GameState->World.Width), ColorAlpha(VA_BLUE, 150));
+                    DrawRect(World, IdxToXY(i, World->Width), ColorAlpha(VA_BLUE, 150));
                 }
             }
         }

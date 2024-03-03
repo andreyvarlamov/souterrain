@@ -3,6 +3,16 @@
 
 #include "sav_lib.h"
 
+#include "va_util.h"
+#include "va_types.h"
+#include "va_memarena.h"
+#include "va_linmath.h"
+#include "va_colors.h"
+
+#ifndef SAV_DEBUG
+#define SAV_DEBUG
+#endif
+
 struct glyph_atlas
 {
     sav_texture T;
@@ -91,6 +101,45 @@ struct entity_queue_node
     int LeftoverCost;
 };
 
+enum { DARKNESS_UNSEEN = 255, DARKNESS_SEEN = 180, DARKNESS_IN_VIEW = 0 };
+
+struct room
+{
+    int X;
+    int Y;
+    int W;
+    int H;
+};
+
+enum tile_type
+{
+    TILE_NONE = 0,
+    TILE_STONE = 1,
+    TILE_GRASS,
+    TILE_WATER,
+    TILE_COUNT
+};
+
+enum { OPEN_SET_MAX = 1024, PATH_MAX = 512 };
+
+struct path_state
+{
+    int *OpenSet;
+    int OpenSetCount;
+
+    int *CameFrom;
+    f32 *GScores;
+    f32 *FScores;
+    int MapSize;
+};
+
+struct path_result
+{
+    b32 FoundPath;
+    vec2i *Path;
+    int PathSteps;
+};
+
 struct world
 {
     int Width;
@@ -160,6 +209,17 @@ struct game_state
     int GroundPointCount;
 
     b32 IgnoreFieldOfView;
+};
+
+static_g vec2i DIRECTIONS[] = {
+    Vec2I( 0, -1),
+    Vec2I( 1, -1),
+    Vec2I( 1,  0),
+    Vec2I( 1,  1),
+    Vec2I( 0,  1),
+    Vec2I(-1,  1),
+    Vec2I(-1,  0),
+    Vec2I(-1, -1)
 };
 
 inline vec2i IdxToXY(int I, int Width) { return Vec2I(I % Width, I / Width); }

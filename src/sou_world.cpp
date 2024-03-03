@@ -1,15 +1,6 @@
-#include <cstring> // memset
+#include "souterrain.h"
 
-static_g vec2i DIRECTIONS[] = {
-    Vec2I( 0, -1),
-    Vec2I( 1, -1),
-    Vec2I( 1,  0),
-    Vec2I( 1,  1),
-    Vec2I( 0,  1),
-    Vec2I(-1,  1),
-    Vec2I(-1,  0),
-    Vec2I(-1, -1)
-};
+#include <cstring> // memset
 
 // SECTION: ENTITY AND SPATIAL
 
@@ -258,126 +249,7 @@ ValidateEntitySpatialPartition(world *World)
     return true;
 }
 
-// SECTION: ENTITY BEHAVIOR
-void
-EntityAttacksEntity(entity *Attacker, entity *Defender, world *World)
-{
-    int AttackRoll = RollDice(1, 20);
-
-    b32 AttackConnects = AttackRoll + Attacker->Kitrina > Defender->ArmorClass;
-
-    if (AttackConnects)
-    {
-        int DamageValue = RollDice(1, Attacker->Damage) + Max(0, (Attacker->Haima - 5) / 2);
-        Defender->Health -= DamageValue;
-
-        if (Defender->Health > 0)
-        {
-            LogEntityAction(Attacker, World,
-                            "%s (%d) hits %s (%d) for %d damage (%d + %d > %d). Health: %d.",
-                            Attacker->Name, Attacker->DebugID,
-                            Defender->Name, Defender->DebugID,
-                            DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass,
-                            Defender->Health);
-        }
-        else
-        {
-            LogEntityAction(Attacker, World,
-                            "%s (%d) hits %s (%d) for %d damage (%d + %d > %d), killing them.",
-                            Attacker->Name, Attacker->DebugID,
-                            Defender->Name, Defender->DebugID,
-                            DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass);
-        }
-    }
-    else
-    {
-        LogEntityAction(Attacker, World,
-                        "%s (%d) misses %s (%d) (%d + %d <= %d).",
-                        Attacker->Name, Attacker->DebugID,
-                        Defender->Name, Defender->DebugID,
-                        AttackRoll, Attacker->Kitrina, Defender->ArmorClass);
-    }
-}
-
-b32
-ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World)
-{
-    switch(ActiveEntity->Type)
-    {
-        case ENTITY_PLAYER:
-        case ENTITY_NPC:
-        {
-            switch (PassiveEntity->Type)
-            {
-                case ENTITY_PLAYER:
-                case ENTITY_NPC:
-                {
-                    EntityAttacksEntity(ActiveEntity, PassiveEntity, World);
-                    return true;
-                } break;
-
-                default: break;
-            }
-        };
-        
-        default: break;
-    }
-    
-    return false;
-}
-
-b32
-MoveEntity(world *World, entity *Entity, vec2i NewP, b32 *Out_TurnUsed)
-{
-    *Out_TurnUsed = false;
-    
-    Assert(Entity->Type > 0);
-    
-    collision_info Col = CheckCollisions(World, NewP);
-
-    if (Col.Collided)
-    {
-        if (Col.Entity)
-        {
-            *Out_TurnUsed = ResolveEntityCollision(Entity, Col.Entity, World);
-        }
-
-        return false;
-    }
-    else
-    {
-        RemoveEntityFromSpatial(World, Entity->Pos, Entity);
-        AddEntityToSpatial(World, NewP, Entity);
-
-        Entity->Pos = NewP;
-        
-#if 0
-        TraceLog("%s (%d) moves without hitting anyone", Entity->Name, Entity->DebugID);
-#endif
-        
-        *Out_TurnUsed = true;
-        return true;
-    }
-}
-
 // SECTION: WORLD GEN
-struct room
-{
-    int X;
-    int Y;
-    int W;
-    int H;
-};
-
-enum tile_type
-{
-    TILE_NONE = 0,
-    TILE_STONE = 1,
-    TILE_GRASS,
-    TILE_WATER,
-    TILE_COUNT
-};
-
 vec2i
 GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
 {
@@ -661,19 +533,6 @@ GenerateWorld(game_state *GameState)
 }
 
 // SECTION: PATHFINDING
-enum { OPEN_SET_MAX = 1024, PATH_MAX = 512 };
-
-struct path_state
-{
-    int *OpenSet;
-    int OpenSetCount;
-
-    int *CameFrom;
-    f32 *GScores;
-    f32 *FScores;
-    int MapSize;
-};
-
 f32
 GetHeuristic(vec2i Start, vec2i End)
 {
@@ -766,13 +625,6 @@ GetNeighbors(vec2i Pos, world *World,
         }
     }
 }
-
-struct path_result
-{
-    b32 FoundPath;
-    vec2i *Path;
-    int PathSteps;
-};
 
 path_result
 CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memory_arena *ResultArena,  int VizGenMax)
@@ -1202,4 +1054,239 @@ EntityTurnQueueDelete(world *World, entity *Entity)
         World->EntityTurnQueue[ShiftI] = World->EntityTurnQueue[ShiftI + 1];
     }
     World->TurnQueueCount--;
+}
+
+// SECTION: ENTITY BEHAVIOR
+void
+EntityAttacksEntity(entity *Attacker, entity *Defender, world *World)
+{
+    int AttackRoll = RollDice(1, 20);
+
+    b32 AttackConnects = AttackRoll + Attacker->Kitrina > Defender->ArmorClass;
+
+    if (AttackConnects)
+    {
+        int DamageValue = RollDice(1, Attacker->Damage) + Max(0, (Attacker->Haima - 5) / 2);
+        Defender->Health -= DamageValue;
+
+        if (Defender->Health > 0)
+        {
+            LogEntityAction(Attacker, World,
+                            "%s (%d) hits %s (%d) for %d damage (%d + %d > %d). Health: %d.",
+                            Attacker->Name, Attacker->DebugID,
+                            Defender->Name, Defender->DebugID,
+                            DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass,
+                            Defender->Health);
+        }
+        else
+        {
+            LogEntityAction(Attacker, World,
+                            "%s (%d) hits %s (%d) for %d damage (%d + %d > %d), killing them.",
+                            Attacker->Name, Attacker->DebugID,
+                            Defender->Name, Defender->DebugID,
+                            DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass);
+        }
+    }
+    else
+    {
+        LogEntityAction(Attacker, World,
+                        "%s (%d) misses %s (%d) (%d + %d <= %d).",
+                        Attacker->Name, Attacker->DebugID,
+                        Defender->Name, Defender->DebugID,
+                        AttackRoll, Attacker->Kitrina, Defender->ArmorClass);
+    }
+}
+
+b32
+ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World)
+{
+    switch(ActiveEntity->Type)
+    {
+        case ENTITY_PLAYER:
+        case ENTITY_NPC:
+        {
+            switch (PassiveEntity->Type)
+            {
+                case ENTITY_PLAYER:
+                case ENTITY_NPC:
+                {
+                    EntityAttacksEntity(ActiveEntity, PassiveEntity, World);
+                    return true;
+                } break;
+
+                default: break;
+            }
+        };
+        
+        default: break;
+    }
+    
+    return false;
+}
+
+b32
+MoveEntity(world *World, entity *Entity, vec2i NewP, b32 *Out_TurnUsed)
+{
+    *Out_TurnUsed = false;
+    
+    Assert(Entity->Type > 0);
+    
+    collision_info Col = CheckCollisions(World, NewP);
+
+    if (Col.Collided)
+    {
+        if (Col.Entity)
+        {
+            *Out_TurnUsed = ResolveEntityCollision(Entity, Col.Entity, World);
+        }
+
+        return false;
+    }
+    else
+    {
+        RemoveEntityFromSpatial(World, Entity->Pos, Entity);
+        AddEntityToSpatial(World, NewP, Entity);
+
+        Entity->Pos = NewP;
+        
+#if 0
+        TraceLog("%s (%d) moves without hitting anyone", Entity->Name, Entity->DebugID);
+#endif
+        
+        *Out_TurnUsed = true;
+        return true;
+    }
+}
+
+b32
+LookAround(entity *Entity, world *World)
+{
+    return EntityExists(World->PlayerEntity) && IsInLineOfSight(World, Entity->Pos, World->PlayerEntity->Pos, Entity->ViewRange);
+}
+
+void
+UpdateNpcState(game_state *GameState, world *World, entity *Entity)
+{
+    // NOTE: Pre-update
+    switch (Entity->NpcState)
+    {
+        case NPC_STATE_IDLE:
+        {
+            if (LookAround(Entity, World))
+            {
+                Entity->NpcState = NPC_STATE_HUNTING;
+                TraceLog("%s (%d): player is in FOV. Now hunting player", Entity->Name, Entity->DebugID);
+            }
+        } break;
+
+        case NPC_STATE_HUNTING:
+        {
+            if (!LookAround(Entity, World))
+            {
+                // NOTE: The player position here is already the position that the entity hasn't seen,
+                //       but to help with bad fov around corners, give entity one turn of "clairvoyance".
+                // TODO: Only update target here if the new player pos is within a certain radius, or in los of the old target
+                //       to prevent following the player if he teleported
+                Entity->Target = World->PlayerEntity->Pos;
+
+                Entity->NpcState = NPC_STATE_SEARCHING;
+                TraceLog("%s (%d): player is missing. Searching where last seen: (%d, %d)", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
+            }
+            else
+            {
+                Entity->Target = World->PlayerEntity->Pos;
+            }
+            
+        } break;
+
+        case NPC_STATE_SEARCHING:
+        {
+            if (LookAround(Entity, World))
+            {
+                Entity->NpcState = NPC_STATE_HUNTING;
+                TraceLog("%s (%d): found player. Now hunting player", Entity->Name, Entity->DebugID);
+            }
+            else if (Entity->Pos == Entity->Target)
+            {
+                Entity->NpcState = NPC_STATE_IDLE;
+                TraceLog("%s (%d): no player in last known location. Now idle", Entity->Name, Entity->DebugID);
+            }
+        } break;
+
+        default:
+        {
+            InvalidCodePath;
+        } break;
+    }
+
+    // NOTE: Update
+    switch (Entity->NpcState)
+    {
+        case NPC_STATE_IDLE:
+        {
+            int ShouldMove = GetRandomValue(0, 12);
+            if (ShouldMove >= 6)
+            {
+                int RandDir = GetRandomValue(0, 4);
+                vec2i NewEntityP = Entity->Pos;
+                switch (RandDir) {
+                    case 0: {
+                        NewEntityP += Vec2I(0, -1);
+                    } break;
+                    case 1:
+                    {
+                        NewEntityP += Vec2I(1, 0);
+                    } break;
+                    case 2:
+                    {
+                        NewEntityP += Vec2I(0, 1);
+                    } break;
+                    case 3:
+                    {
+                        NewEntityP += Vec2I(-1, 0);
+                    } break;
+                    default: break;
+                }
+
+                b32 TurnUsed;
+                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
+            }
+        } break;
+
+        case NPC_STATE_HUNTING:
+        {
+            Entity->Target = World->PlayerEntity->Pos;
+            path_result Path = CalculatePath(World,
+                                             Entity->Pos, World->PlayerEntity->Pos,
+                                             &GameState->TrArenaA, &GameState->TrArenaB,
+                                             0);
+            
+            if (Path.FoundPath && Path.Path)
+            {
+                vec2i NewEntityP = Path.Path[0];
+                b32 TurnUsed;
+                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
+            }
+        } break;
+
+        case NPC_STATE_SEARCHING:
+        {
+            path_result Path = CalculatePath(World,
+                                             Entity->Pos, Entity->Target,
+                                             &GameState->TrArenaA, &GameState->TrArenaB,
+                                             0);
+            
+            if (Path.FoundPath && Path.Path)
+            {
+                vec2i NewEntityP = Path.Path[0];
+                b32 TurnUsed;
+                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
+            }
+        } break;
+
+        default:
+        {
+            InvalidCodePath;
+        } break;
+    }
 }
