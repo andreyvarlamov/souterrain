@@ -174,6 +174,14 @@ struct collision_info
     b32 Collided;
 };
 
+enum run_state
+{
+    RUN_STATE_NONE = 0,
+    RUN_STATE_PROCESSING_PLAYER,
+    RUN_STATE_PROCESSING_ENTITIES,
+    RUN_STATE_COUNT,
+};
+
 struct game_state
 {
     b32 IsInitialized;
@@ -209,6 +217,8 @@ struct game_state
     int GroundPointCount;
 
     b32 IgnoreFieldOfView;
+
+    run_state RunState;
 };
 
 static_g vec2i DIRECTIONS[] = {
@@ -229,6 +239,13 @@ inline b32 CheckFlags(u32 Flags, u32 Mask) { return Flags & Mask; }
 inline void SetFlags(u32 *Flags, u32 Mask) { *Flags |= Mask; }
 inline void ClearFlags(u32 *Flags, u32 Mask) { *Flags &= ~Mask; }
 inline b32 EntityExists(entity *Entity) { return Entity->Type > 0; }
+
+inline b32 EntityIsDead(entity *Entity)
+{
+    return ((Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC) ?
+            (Entity->Health <= 0) :
+            (Entity->Condition <= 0.0f));
+}
 
 inline void
 UpdateCameraToWorldTarget(camera_2d *Camera, world *World, vec2i WorldP)

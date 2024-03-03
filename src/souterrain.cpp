@@ -537,81 +537,115 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
     vec2i PlayerRequestedDP = Vec2I();
     b32 PlayerRequestedSkipTurn = false;
-    if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_E)) PlayerRequestedDP = Vec2I( 1, -1);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_A)) PlayerRequestedDP = Vec2I(-1,  0);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_X)) PlayerRequestedDP = Vec2I( 0,  1);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_D)) PlayerRequestedDP = Vec2I( 1,  0);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) PlayerRequestedDP = Vec2I(-1,  1);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_C)) PlayerRequestedDP = Vec2I( 1,  1);
-    if (KeyPressedOrRepeat(SDL_SCANCODE_S)) PlayerRequestedSkipTurn = true;
-
-    b32 PlayerFovDirty = false;
-
-    if (KeyPressed(SDL_SCANCODE_F))
-    {
-        GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
-        PlayerFovDirty = true;
-    }
     
     // SECTION: GAME LOGIC UPDATE
-    entity *ActiveEntity = EntityTurnQueuePeek(&GameState->World);
+    b32 PlayerFovDirty = false;
 
-    if (ActiveEntity == World->PlayerEntity)
+    switch (GameState->RunState)
     {
-        if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn)
+        case RUN_STATE_NONE:
         {
-            b32 TurnUsed = true;
-            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0)
+            GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+        } break;
+
+        case RUN_STATE_PROCESSING_PLAYER:
+        {
+            if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_E)) PlayerRequestedDP = Vec2I( 1, -1);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_A)) PlayerRequestedDP = Vec2I(-1,  0);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_X)) PlayerRequestedDP = Vec2I( 0,  1);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_D)) PlayerRequestedDP = Vec2I( 1,  0);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) PlayerRequestedDP = Vec2I(-1,  1);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_C)) PlayerRequestedDP = Vec2I( 1,  1);
+            if (KeyPressedOrRepeat(SDL_SCANCODE_S)) PlayerRequestedSkipTurn = true;
+
+            if (KeyPressed(SDL_SCANCODE_F))
             {
-                TraceLog("");
-                TraceLog("-------------Player makes a move--------------");
-                
-                vec2i NewP = World->PlayerEntity->Pos + PlayerRequestedDP;
-                // NOTE: Move entity can set TurnUsed to false, if that was a non-attack collision
-                if (MoveEntity(World, World->PlayerEntity, NewP, &TurnUsed))
+                GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
+                PlayerFovDirty = true;
+            }
+
+            entity *ActiveEntity = EntityTurnQueuePeek(World);
+            if (ActiveEntity != Player)
+            {
+                GameState->RunState = RUN_STATE_PROCESSING_ENTITIES;
+                break;
+            }
+
+            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn)
+            {
+                b32 TurnUsed = true;
+                if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0)
                 {
-                    UpdateCameraToWorldTarget(&GameState->Camera, World, NewP);
-                    PlayerFovDirty = true;
+                    TraceLog("");
+                    TraceLog("-------------Player makes a move--------------");
+                
+                    vec2i NewP = World->PlayerEntity->Pos + PlayerRequestedDP;
+                    // NOTE: Move entity can set TurnUsed to false, if that was a non-attack collision
+                    if (MoveEntity(World, World->PlayerEntity, NewP, &TurnUsed))
+                    {
+                        UpdateCameraToWorldTarget(&GameState->Camera, World, NewP);
+                        PlayerFovDirty = true;
+                    }
+                }
+
+                if (TurnUsed)
+                {
+                    if (World->TurnsPassed - World->PlayerEntity->LastHealTurn > World->PlayerEntity->RegenActionCost &&
+                        World->PlayerEntity->Health < World->PlayerEntity->MaxHealth && GetRandomValue(0, 2) == 0)
+                    {
+                        int RegenAmount = RollDice(1, World->PlayerEntity->RegenAmount);
+                        World->PlayerEntity->Health += RegenAmount;
+                        World->PlayerEntity->LastHealTurn = World->TurnsPassed;
+                        TraceLog("Player regens %d health.", RegenAmount);
+                    }
+
+                    World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
+                    ActiveEntity = EntityTurnQueuePeek(World);
                 }
             }
 
-            if (TurnUsed)
+            if (ActiveEntity != Player)
             {
-                if (World->TurnsPassed - World->PlayerEntity->LastHealTurn > World->PlayerEntity->RegenActionCost &&
-                    World->PlayerEntity->Health < World->PlayerEntity->MaxHealth && GetRandomValue(0, 2) == 0)
-                {
-                    int RegenAmount = RollDice(1, World->PlayerEntity->RegenAmount);
-                    World->PlayerEntity->Health += RegenAmount;
-                    World->PlayerEntity->LastHealTurn = World->TurnsPassed;
-                    TraceLog("Player regens %d health.", RegenAmount);
-                }
+                GameState->RunState = RUN_STATE_PROCESSING_ENTITIES;
+            }
+        } break;
 
-                
+        case RUN_STATE_PROCESSING_ENTITIES:
+        {
+            entity *StartingEntity = EntityTurnQueuePeek(World);
+            entity *ActiveEntity = StartingEntity;
+            while (ActiveEntity != World->PlayerEntity)
+            {
+                if (ActiveEntity->Type == ENTITY_NPC)
+                {
+                    UpdateNpcState(GameState, World, ActiveEntity);
+                }
+        
                 World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
                 ActiveEntity = EntityTurnQueuePeek(World);
+
+                if (ActiveEntity == StartingEntity)
+                {
+                    break;
+                }
             }
-        }
+
+            if (ActiveEntity == Player)
+            {
+                GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+            }
+        } break;
+
+        default:
+        {
+            TraceLog("Unknown run state: %d", GameState->RunState);
+            *Quit = true;
+        };
     }
 
-    entity *StartingEntity = ActiveEntity;
-    while (ActiveEntity != World->PlayerEntity)
-    {
-        if (ActiveEntity->Type == ENTITY_NPC)
-        {
-            UpdateNpcState(GameState, World, ActiveEntity);
-        }
-        
-        World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
-        ActiveEntity = EntityTurnQueuePeek(World);
-
-        if (ActiveEntity == StartingEntity)
-        {
-            break;
-        }
-    }
-
+    // NOTE: Update player FOV and darkness levels
     if (PlayerFovDirty || FirstFrame)
     {
         if (!GameState->IgnoreFieldOfView)
@@ -644,12 +678,13 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
     Assert(ValidateEntitySpatialPartition(&GameState->World));
 #endif
-    
+
+    // NOTE: Delete dead entities
     for (int i = 0; i < World->EntityUsedCount; i++)
     {
         entity *Entity = World->Entities + i;
 
-        if (EntityExists(Entity) && (Entity->Condition <= 0.0f || Entity->Health < 0))
+        if (EntityExists(Entity) && EntityIsDead(Entity))
         {
             if (Entity->ActionCost > 0)
             {
