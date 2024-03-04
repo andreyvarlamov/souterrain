@@ -525,19 +525,26 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     }
 
     // SECTION: CHECK INPUTS
+#ifdef SAV_DEBUG  
     if (KeyPressed(SDL_SCANCODE_B))
     {
         Breakpoint;
+
+        entity **DebugEntities;
+        int Count;
+        GetAllEntitiesOfType(ENTITY_ITEM_PICKUP, World, &GameState->TrArenaA, &DebugEntities, &Count);
+
+        GetAllEntitiesOfType(ENTITY_NPC, World, &GameState->TrArenaA, &DebugEntities, &Count);
+
+        Noop;
     }
+#endif
 
     if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
 
     if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
     if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
 
-    vec2i PlayerRequestedDP = Vec2I();
-    b32 PlayerRequestedSkipTurn = false;
-    
     // SECTION: GAME LOGIC UPDATE
     b32 PlayerFovDirty = false;
 
@@ -550,6 +557,10 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_PROCESSING_PLAYER:
         {
+            vec2i PlayerRequestedDP = Vec2I();
+            b32 PlayerRequestedSkipTurn = false;
+            b32 PlayerRequestedItemPickup = false;
+    
             if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_E)) PlayerRequestedDP = Vec2I( 1, -1);
@@ -559,6 +570,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) PlayerRequestedDP = Vec2I(-1,  1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_C)) PlayerRequestedDP = Vec2I( 1,  1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_S)) PlayerRequestedSkipTurn = true;
+            if (KeyPressed(SDL_SCANCODE_G)) PlayerRequestedItemPickup = true;
 
             if (KeyPressed(SDL_SCANCODE_F))
             {
@@ -573,10 +585,63 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 break;
             }
 
-            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn)
+            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemPickup)
             {
-                b32 TurnUsed = true;
-                if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0)
+                b32 TurnUsed = false;
+                if (PlayerRequestedItemPickup)
+                {
+                    entity *ItemPickup = GetEntitiesAt(Player->Pos, World);
+                    while (ItemPickup)
+                    {
+                        if (ItemPickup->Type == ENTITY_ITEM_PICKUP)
+                        {
+                            item *ItemFromPickup = ItemPickup->Inventory;
+                            for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromPickup++)
+                            {
+                                if (ItemFromPickup->ItemType > ITEM_NONE)
+                                {
+                                    item *PlayerItemSlot = Player->Inventory;
+                                    for (int j = 0; j < INVENTORY_SLOTS_PER_ENTITY; j++, PlayerItemSlot++)
+                                    {
+                                        if (PlayerItemSlot->ItemType == ITEM_NONE)
+                                        {
+                                            *PlayerItemSlot = *ItemFromPickup;
+                                            ItemFromPickup->ItemType = ITEM_NONE;
+                                            TurnUsed = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            int I;
+                            for (I = 0; I < INVENTORY_SLOTS_PER_ENTITY; I++)
+                            {
+                                if (ItemPickup->Inventory[I].ItemType > ITEM_NONE)
+                                {
+                                    break;
+                                }
+                            }
+
+                            if (I < INVENTORY_SLOTS_PER_ENTITY)
+                            {
+                                ItemPickup->Glyph = ItemPickup->Inventory[I].Glyph;
+                                ItemPickup->Color = ItemPickup->Inventory[I].Color;
+                            }
+                            else
+                            {
+                                ItemPickup->Health = 0;
+                            }
+                        }
+                        
+                        ItemPickup = ItemPickup->Next;
+                    }
+                }
+                else if (PlayerRequestedSkipTurn)
+                {
+                    TurnUsed = true;
+                }
+                else if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0)
                 {
                     TraceLog("");
                     TraceLog("-------------Player makes a move--------------");
@@ -669,16 +734,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     }
 
     // SECTION: GAME LOGIC POST UPDATE
-#ifdef SAV_DEBUG  
-    entity **CharEntities;
-    int Count;
-    GetAllCharacterEntities(World, &GameState->TrArenaA, &CharEntities, &Count);
-
-    Noop;
-
-    Assert(ValidateEntitySpatialPartition(&GameState->World));
-#endif
-
     // NOTE: Delete dead entities
     for (int i = 0; i < World->EntityUsedCount; i++)
     {
@@ -694,10 +749,12 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         }
     }
 
+    Assert(ValidateEntitySpatialPartition(&GameState->World));
+
     vec2 MouseP = GetMousePos();
     vec2 MouseWorldPxP = CameraScreenToWorld(&GameState->Camera, MouseP);
     vec2i MouseTileP = GetTilePFromPxP(World, MouseWorldPxP);
-    entity *HighlightedEntity = IsInFOV(World, Player->FieldOfView, MouseTileP) ? GetEntitiesAt(World, MouseTileP) : NULL;
+    entity *HighlightedEntity = IsInFOV(World, Player->FieldOfView, MouseTileP) ? GetEntitiesAt(MouseTileP, World) : NULL;
  
     // SECTION: RENDER
     // NOTE: Draw debug overlay
@@ -747,6 +804,13 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                    true, ColorAlpha(VA_BLACK, 128),
                    &GameState->TrArenaA);
 
+        DrawString(TextFormat("Turn: %lld", World->TurnsPassed),
+                   GameState->TitleFont,
+                   GameState->TitleFont->PointSize,
+                   10, 160, 0,
+                   VA_MAROON,
+                   true, ColorAlpha(VA_BLACK, 128),
+                   &GameState->TrArenaA);
 
         // NOTE: Inspect UI
         if (HighlightedEntity != NULL)
@@ -782,13 +846,13 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                            false, VA_BLACK,
                            &GameState->TrArenaA);
 
-                DrawString(TextFormat("Attack: %d", HighlightedEntity->AttackModifier),
-                           GameState->TitleFont,
-                           GameState->TitleFont->PointSize,
-                           1510, 160, 0,
-                           VA_BLACK,
-                           false, VA_BLACK,
-                           &GameState->TrArenaA);
+                // DrawString(TextFormat("Attack: %d", HighlightedEntity->AttackModifier),
+                //            GameState->TitleFont,
+                //            GameState->TitleFont->PointSize,
+                //            1510, 160, 0,
+                //            VA_BLACK,
+                //            false, VA_BLACK,
+                //            &GameState->TrArenaA);
 
                 DrawString(TextFormat("Damage: 1d%d", HighlightedEntity->Damage),
                            GameState->TitleFont,
@@ -833,13 +897,13 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                        false, VA_BLACK,
                        &GameState->TrArenaA);
 
-            DrawString(TextFormat("Attack: %d", World->PlayerEntity->AttackModifier),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       160, 890, 0,
-                       VA_BLACK,
-                       false, VA_BLACK,
-                       &GameState->TrArenaA);
+            // DrawString(TextFormat("Attack: %d", World->PlayerEntity->AttackModifier),
+            //            GameState->TitleFont,
+            //            GameState->TitleFont->PointSize,
+            //            160, 890, 0,
+            //            VA_BLACK,
+            //            false, VA_BLACK,
+            //            &GameState->TrArenaA);
 
             DrawString(TextFormat("Damage: 1d%d", World->PlayerEntity->Damage),
                        GameState->TitleFont,

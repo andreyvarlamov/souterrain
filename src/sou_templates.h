@@ -18,7 +18,6 @@ Template_PumiceWall()
     Template.Type = ENTITY_STATIC;
     Template.Color = VA_SLATEGRAY;
     Template.Glyph = 11 + 16*13;
-    Template.Condition = 100.0f;
     Template.Name = "Pumice Wall";
     Template.Description = "Wall made of soft pumice rock.";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING | ENTITY_IS_OPAQUE);
@@ -37,7 +36,6 @@ Template_Player()
     Template.Type = ENTITY_PLAYER;
     Template.Color = VA_MAROON;
     Template.Glyph = '@';
-    Template.Condition = 100.0f;
     Template.ViewRange = 30;
     Template.Name = "Player";
     Template.Description = "After Derval's disappearance you awake in the Souterrain. You've read about this place in the dusty tomes kept in St Catherine's Library. You remember one thing: the only way is down.";
@@ -71,7 +69,6 @@ Template_AetherFly()
     Template.Type = ENTITY_NPC;
     Template.Color = VA_CORAL;
     Template.Glyph = 1 + 9*16;
-    Template.Condition = 100.0f;
     Template.ViewRange = 15;
     Template.NpcState = NPC_STATE_IDLE;
     Template.Name = "Aether Fly";

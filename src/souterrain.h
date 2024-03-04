@@ -13,18 +13,6 @@
 #define SAV_DEBUG
 #endif
 
-struct glyph_atlas
-{
-    sav_texture T;
-    int GlyphsPerRow;
-    int GlyphPadX;
-    int GlyphPadY;
-    int GlyphPxW;
-    int GlyphPxH;
-    int GlyphPxWPad;
-    int GlyphPxHPad;
-};
-
 enum entity_flags
 {
     ENTITY_IS_BLOCKING = 0x1,
@@ -50,16 +38,35 @@ enum npc_state
     NPC_STATE_COUNT
 };
 
+enum item_type
+{
+    ITEM_NONE = 0,
+    ITEM_MELEE,
+    ITEM_RANGED,
+    ITEM_HEAD,
+    ITEM_CHEST,
+    ITEM_ARMS,
+    ITEM_LEGS,
+    ITEM_CONSUMABLE,
+    ITEM_COUNT
+};
+
+enum { INVENTORY_SLOTS_PER_ENTITY = 64 };
+
+struct item
+{
+    u8 ItemType;
+    u8 Glyph;
+    color Color;
+};
+
 struct entity
 {
     u8 Type;
     u8 Glyph;
-    u8 IsTex;
     color Color;
-    sav_texture Tex;
     
     vec2i Pos;
-    f32 Condition;
     int ActionCost;
     u32 Flags;
 
@@ -80,10 +87,9 @@ struct entity
     int Health;
     int MaxHealth;
     int ArmorClass;
-    int AttackModifier;
     int Damage;
 
-    int LastHealTurn;
+    i64 LastHealTurn;
     int RegenActionCost;
     int RegenAmount;
 
@@ -91,6 +97,8 @@ struct entity
     int Kitrina;
     int Melana;
     int Sera;
+
+    item *Inventory;
 };
 
 enum { ENTITY_MAX_COUNT = 16384 };
@@ -163,7 +171,7 @@ struct world
     int TurnQueueCount;
     int TurnQueueMax;
 
-    int TurnsPassed;
+    i64 TurnsPassed;
 
     entity *PlayerEntity;
 };
@@ -180,6 +188,18 @@ enum run_state
     RUN_STATE_PROCESSING_PLAYER,
     RUN_STATE_PROCESSING_ENTITIES,
     RUN_STATE_COUNT,
+};
+
+struct glyph_atlas
+{
+    sav_texture T;
+    int GlyphsPerRow;
+    int GlyphPadX;
+    int GlyphPadY;
+    int GlyphPxW;
+    int GlyphPxH;
+    int GlyphPxWPad;
+    int GlyphPxHPad;
 };
 
 struct game_state
@@ -239,13 +259,7 @@ inline b32 CheckFlags(u32 Flags, u32 Mask) { return Flags & Mask; }
 inline void SetFlags(u32 *Flags, u32 Mask) { *Flags |= Mask; }
 inline void ClearFlags(u32 *Flags, u32 Mask) { *Flags &= ~Mask; }
 inline b32 EntityExists(entity *Entity) { return Entity->Type > 0; }
-
-inline b32 EntityIsDead(entity *Entity)
-{
-    return ((Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC) ?
-            (Entity->Health <= 0) :
-            (Entity->Condition <= 0.0f));
-}
+inline b32 EntityIsDead(entity *Entity) { return Entity->Health <= 0; }
 
 inline void
 UpdateCameraToWorldTarget(camera_2d *Camera, world *World, vec2i WorldP)
@@ -268,18 +282,6 @@ GetGlyphSourceRect(glyph_atlas Atlas, u8 Glyph)
     int X = P.X * Atlas.GlyphPxWPad + Atlas.GlyphPadX;
     int Y = P.Y * Atlas.GlyphPxHPad + Atlas.GlyphPadY;
     return Rect(X, Y, Atlas.GlyphPxW, Atlas.GlyphPxH);
-}
-
-inline entity
-GetTestEntityBlueprint(entity_type Type, u8 Glyph, color Color)
-{
-    entity Blueprint = {};
-    Blueprint.Type = (u8) Type;
-    Blueprint.IsTex = false;
-    Blueprint.Color = Color;
-    Blueprint.Glyph = Glyph;
-    Blueprint.Condition = 100.0f;
-    return Blueprint;
 }
 
 inline void

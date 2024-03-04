@@ -5,7 +5,7 @@
 // SECTION: ENTITY AND SPATIAL
 
 entity *
-GetEntitiesAt(world *World, vec2i P)
+GetEntitiesAt(vec2i P, world *World)
 {
     if(IsPValid(P, World))
     {
@@ -16,18 +16,36 @@ GetEntitiesAt(world *World, vec2i P)
     return NULL;
 }
 
-void
-GetAllCharacterEntities(world *World, memory_arena *TrArena, entity ***CharEntities, int *Count)
+entity *
+GetEntitiesOfTypeAt(vec2i P, entity_type EntityType, world *World)
 {
-    *CharEntities = MemoryArena_PushArray(TrArena, World->EntityUsedCount, entity *);
+    entity *Entity = GetEntitiesAt(P, World);
+
+    while (Entity)
+    {
+        if (Entity->Type == EntityType)
+        {
+            break;
+        }
+
+        Entity = Entity->Next;
+    }
+
+    return Entity;
+}
+
+void
+GetAllEntitiesOfType(entity_type EntityType, world *World, memory_arena *TrArena, entity ***Entities, int *Count)
+{
+    *Entities = MemoryArena_PushArray(TrArena, World->EntityUsedCount, entity *);
     *Count = 0;
     
     for (int i = 0; i < World->EntityUsedCount; i++)
     {
         entity *Entity = World->Entities + i;
-        if (Entity->Type == ENTITY_NPC || Entity->Type == ENTITY_PLAYER)
+        if (Entity->Type == EntityType)
         {
-            (*CharEntities)[(*Count)++] = Entity;
+            (*Entities)[(*Count)++] = Entity;
         }
     }
     
@@ -41,7 +59,7 @@ CheckCollisions(world *World, vec2i P)
     
     if (IsPValid(P, World))
     {
-        entity *HeadEntity = GetEntitiesAt(World, P);
+        entity *HeadEntity = GetEntitiesAt(P, World);
 
         b32 FoundBlocking = false;
 
@@ -83,7 +101,7 @@ IsTileOpaque(world *World, vec2i P)
 {
     if (IsPValid(P, World))
     {
-        entity *HeadEntity = GetEntitiesAt(World, P);
+        entity *HeadEntity = GetEntitiesAt(P, World);
 
         b32 FoundOpaque = false;
 
@@ -190,6 +208,8 @@ FindNextFreeEntitySlot(world *World)
 
 void EntityTurnQueueInsert(world *World, entity *Entity, int NewCostOwed);
 
+enum { ENTITY_HEALTH_DEFAULT = 100 };
+
 entity *
 AddEntity(world *World, vec2i Pos, entity *CopyEntity, memory_arena *WorldArena)
 {
@@ -203,9 +223,19 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity, memory_arena *WorldArena)
         // TODO: Allocate only for the entity max range rect
         Entity->FieldOfView = MemoryArena_PushArray(WorldArena, World->Width * World->Height, u8);
     }
+
+    b32 NeedInventory = Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_ITEM_PICKUP;
+    if (NeedInventory && Entity->Inventory == NULL)
+    {
+        Entity->Inventory = MemoryArena_PushArrayAndZero(WorldArena, INVENTORY_SLOTS_PER_ENTITY, item);
+    }
     
     Entity->Pos = Pos;
     Entity->DebugID = World->EntityCurrentDebugID++;
+    if (Entity->MaxHealth == 0)
+    {
+        Entity->Health = Entity->MaxHealth = ENTITY_HEALTH_DEFAULT;
+    }
 
     AddEntityToSpatial(World, Pos, Entity);
 
@@ -490,6 +520,28 @@ GenerateWorld(game_state *GameState)
     entity Player = Template_Player();
     World->PlayerEntity = AddEntity(World, Room0Center, &Player, &GameState->WorldArena);
 
+    entity ItemPickupTestTemplate = {};
+    ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
+    entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
+    ItemPickupTest->Inventory[0].ItemType = ITEM_MELEE;
+    ItemPickupTest->Inventory[0].Glyph = ')';
+    ItemPickupTest->Inventory[0].Color = VA_BLUE;
+    ItemPickupTest->Inventory[1].ItemType = ITEM_CHEST;
+    ItemPickupTest->Inventory[1].Glyph = '<';
+    ItemPickupTest->Inventory[1].Color = VA_BROWN;
+    ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
+    ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
+    
+    ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
+    ItemPickupTest->Inventory[0].ItemType = ITEM_CONSUMABLE;
+    ItemPickupTest->Inventory[0].Glyph = '!';
+    ItemPickupTest->Inventory[0].Color = VA_YELLOW;
+    ItemPickupTest->Inventory[1].ItemType = ITEM_RANGED;
+    ItemPickupTest->Inventory[1].Glyph = '(';
+    ItemPickupTest->Inventory[1].Color = VA_GREEN;
+    ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
+    ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
+
     entity AetherFly = Template_AetherFly();
 #if 1
     int EnemyCount = 0;
@@ -512,7 +564,7 @@ GenerateWorld(game_state *GameState)
 #else
     int EnemyCount = 0;
     int AttemptCount = 0;
-    int EnemiesToAdd = 5;
+    int EnemiesToAdd = 0;
     int MaxAttempts = 500;
     while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
     {
