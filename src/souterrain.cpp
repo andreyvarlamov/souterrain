@@ -677,6 +677,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             b32 PlayerRequestedSkipTurn = false;
             b32 PlayerRequestedItemPickup = false;
             b32 PlayerRequestedItemDrop = false;
+            b32 PlayerRequestedTeleport = false;
     
             if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
@@ -689,6 +690,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressedOrRepeat(SDL_SCANCODE_S)) PlayerRequestedSkipTurn = true;
             if (KeyPressed(SDL_SCANCODE_G)) PlayerRequestedItemPickup = true;
             if (KeyPressed(SDL_SCANCODE_R)) PlayerRequestedItemDrop = true;
+            if (KeyPressed(SDL_SCANCODE_T)) PlayerRequestedTeleport = true;
 
             if (KeyPressed(SDL_SCANCODE_F))
             {
@@ -703,7 +705,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 break;
             }
 
-            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemPickup || PlayerRequestedItemDrop)
+            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemPickup || PlayerRequestedItemDrop || PlayerRequestedTeleport)
             {
                 b32 TurnUsed = false;
                 if (PlayerRequestedItemPickup)
@@ -760,14 +762,38 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 {
                     TurnUsed = true;
                 }
-                else if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0)
+                else if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedTeleport)
                 {
                     TraceLog("");
                     TraceLog("-------------Player makes a move--------------");
                 
-                    vec2i NewP = World->PlayerEntity->Pos + PlayerRequestedDP;
+                    vec2i NewP;
+                    b32 FoundPosition;
+                    if (PlayerRequestedTeleport)
+                    {
+                        int Iter = 0;
+                        int MaxIters = 10;
+                        FoundPosition = true;
+                        do
+                        {
+                            NewP = Vec2I(GetRandomValue(0, World->Width), GetRandomValue(0, World->Height));
+
+                            if (Iter++ >= MaxIters)
+                            {
+                                FoundPosition = false;
+                                break;
+                            }
+                        }
+                        while (CheckCollisions(World, NewP).Collided);
+                    }
+                    else
+                    {
+                        FoundPosition = true;
+                        NewP = World->PlayerEntity->Pos + PlayerRequestedDP;
+                    }
+                    
                     // NOTE: Move entity can set TurnUsed to false, if that was a non-attack collision
-                    if (MoveEntity(World, World->PlayerEntity, NewP, &TurnUsed))
+                    if (FoundPosition && MoveEntity(World, World->PlayerEntity, NewP, &TurnUsed))
                     {
                         UpdateCameraToWorldTarget(&GameState->Camera, World, NewP);
                         PlayerFovDirty = true;

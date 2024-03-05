@@ -578,7 +578,7 @@ GenerateWorld(game_state *GameState)
 #else
     int EnemyCount = 0;
     int AttemptCount = 0;
-    int EnemiesToAdd = 0;
+    int EnemiesToAdd = 1;
     int MaxAttempts = 500;
     while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
     {
@@ -1249,11 +1249,14 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
         {
             if (!LookAround(Entity, World))
             {
-                // NOTE: The player position here is already the position that the entity hasn't seen,
+                // NOTE: The player position at this point is already the position that the entity hasn't seen,
                 //       but to help with bad fov around corners, give entity one turn of "clairvoyance".
-                // TODO: Only update target here if the new player pos is within a certain radius, or in los of the old target
-                //       to prevent following the player if he teleported
-                Entity->Target = World->PlayerEntity->Pos;
+                //       Check if new player pos is in line of sight of old target, to prevent entity knowing where player moved,
+                //       if he teleported.
+                if (IsInLineOfSight(World, Entity->Target, World->PlayerEntity->Pos, Entity->ViewRange))
+                {
+                    Entity->Target = World->PlayerEntity->Pos;
+                }
 
                 Entity->NpcState = NPC_STATE_SEARCHING;
                 TraceLog("%s (%d): player is missing. Searching where last seen: (%d, %d)", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
@@ -1333,6 +1336,11 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                 b32 TurnUsed;
                 MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
             }
+            else
+            {
+                Entity->NpcState = NPC_STATE_IDLE;
+                TraceLog("%s (%d): cannot path to player (%d, %d). Now idle", Entity->Name, Entity->DebugID, World->PlayerEntity->Pos.X, World->PlayerEntity->Pos.Y);
+            }
         } break;
 
         case NPC_STATE_SEARCHING:
@@ -1347,6 +1355,11 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                 vec2i NewEntityP = Path.Path[0];
                 b32 TurnUsed;
                 MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
+            }
+            else
+            {
+                Entity->NpcState = NPC_STATE_IDLE;
+                TraceLog("%s (%d): cannot path to target (%d, %d). Now idle", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
             }
         } break;
 
