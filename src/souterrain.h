@@ -58,31 +58,32 @@ struct item
     u8 ItemType;
     u8 Glyph;
     color Color;
+
+    int HaimaBonus;
 };
 
 struct entity
 {
     u8 Type;
+    u32 Flags;
+
+    vec2i Pos;
+    
     u8 Glyph;
     color Color;
-    
-    vec2i Pos;
+
+    int DebugID;
+
     int ActionCost;
-    u32 Flags;
 
     int ViewRange;
     u8 *FieldOfView;
 
     u8 NpcState;
-
     vec2i Target;
 
     const char *Name;
     const char *Description;
-
-    int DebugID;
-
-    entity *Next;
 
     int Health;
     int MaxHealth;
@@ -98,7 +99,11 @@ struct entity
     int Melana;
     int Sera;
 
+    int HaimaBonus;
+    
     item *Inventory;
+
+    entity *Next;
 };
 
 enum { ENTITY_MAX_COUNT = 16384 };

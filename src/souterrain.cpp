@@ -336,8 +336,28 @@ DrawEntities(game_state *GameState)
                 if (DarknessLevel != DARKNESS_UNSEEN)
                 {
                     entity *Entity = GameState->World.SpatialEntities[WorldI];
-                    // TODO: Draw the top npc entity, if none, draw the top item pickup entity
-                    if (Entity) // && (Entity->Glyph != '#' || WillDrawRoomGround))
+
+                    entity *TopCharacter = Entity;
+                    while (TopCharacter)
+                    {
+                        if (TopCharacter->Type == ENTITY_NPC || TopCharacter->Type == ENTITY_PLAYER)
+                        {
+                            break;
+                        }
+                        TopCharacter = TopCharacter->Next;
+                    }
+                    entity *TopItemPickup = Entity;
+                    while (TopItemPickup)
+                    {
+                        if (TopItemPickup->Type == ENTITY_ITEM_PICKUP)
+                        {
+                            break;
+                        }
+                        TopItemPickup = TopItemPickup->Next;
+                    }
+                    Entity = (TopCharacter ? TopCharacter : (TopItemPickup ? TopItemPickup : Entity));
+                    
+                    if (Entity)
                     {
                         if (DarknessLevel == DARKNESS_IN_VIEW || (Entity->Type != ENTITY_NPC))
                         {
@@ -388,6 +408,102 @@ DrawEntities(game_state *GameState)
         EndCameraMode();
     }
     EndDraw();
+}
+
+void
+ApplyHaimaBonus(int HaimaBonus, entity *Entity)
+{
+    Entity->HaimaBonus += HaimaBonus;
+    
+    Entity->MaxHealth += HaimaBonus;
+    if (Entity->MaxHealth <= 0)
+    {
+        Entity->MaxHealth = 1;
+    }
+
+    Entity->Health += HaimaBonus;
+    if (Entity->Health <= 0)
+    {
+        Entity->Health = 1;
+    }
+}
+
+void
+RemoveItemEffectsFromEntity(item *Item, entity *Entity)
+{
+    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
+    {
+        ApplyHaimaBonus(-Item->HaimaBonus, Entity);
+    }
+}
+
+void
+ApplyItemEffectsToEntity(item *Item, entity *Entity)
+{
+    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
+    {
+        ApplyHaimaBonus(Item->HaimaBonus, Entity);
+    }
+}
+
+b32
+AddItemToEntityInventory(item *Item, entity *Entity)
+{
+    if (Entity->Inventory)
+    {
+        item *EntityItemSlot = Entity->Inventory;
+        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, EntityItemSlot++)
+        {
+            if (EntityItemSlot->ItemType == ITEM_NONE)
+            {
+                *EntityItemSlot = *Item;
+                ApplyItemEffectsToEntity(Item, Entity);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void
+RemoveItemFromEntityInventory(item *Item, entity *Entity)
+{
+    if (Entity->Inventory)
+    {
+        item *EntityItemSlot = Entity->Inventory;
+        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, EntityItemSlot++)
+        {
+            if (EntityItemSlot == Item)
+            {
+                RemoveItemEffectsFromEntity(EntityItemSlot, Entity);
+                EntityItemSlot->ItemType = ITEM_NONE;
+            }
+        }
+    }
+}
+
+void
+RefreshItemPickupState(entity *ItemPickup)
+{
+    int I;
+    for (I = 0; I < INVENTORY_SLOTS_PER_ENTITY; I++)
+    {
+        if (ItemPickup->Inventory[I].ItemType > ITEM_NONE)
+        {
+            break;
+        }
+    }
+
+    if (I < INVENTORY_SLOTS_PER_ENTITY)
+    {
+        ItemPickup->Glyph = ItemPickup->Inventory[I].Glyph;
+        ItemPickup->Color = ItemPickup->Inventory[I].Color;
+    }
+    else
+    {
+        ItemPickup->Health = 0;
+    }
 }
 
 GAME_API void
@@ -560,6 +676,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             vec2i PlayerRequestedDP = Vec2I();
             b32 PlayerRequestedSkipTurn = false;
             b32 PlayerRequestedItemPickup = false;
+            b32 PlayerRequestedItemDrop = false;
     
             if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
@@ -571,6 +688,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressedOrRepeat(SDL_SCANCODE_C)) PlayerRequestedDP = Vec2I( 1,  1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_S)) PlayerRequestedSkipTurn = true;
             if (KeyPressed(SDL_SCANCODE_G)) PlayerRequestedItemPickup = true;
+            if (KeyPressed(SDL_SCANCODE_R)) PlayerRequestedItemDrop = true;
 
             if (KeyPressed(SDL_SCANCODE_F))
             {
@@ -585,7 +703,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 break;
             }
 
-            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemPickup)
+            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemPickup || PlayerRequestedItemDrop)
             {
                 b32 TurnUsed = false;
                 if (PlayerRequestedItemPickup)
@@ -600,41 +718,42 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                             {
                                 if (ItemFromPickup->ItemType > ITEM_NONE)
                                 {
-                                    item *PlayerItemSlot = Player->Inventory;
-                                    for (int j = 0; j < INVENTORY_SLOTS_PER_ENTITY; j++, PlayerItemSlot++)
+                                    if (AddItemToEntityInventory(ItemFromPickup, Player))
                                     {
-                                        if (PlayerItemSlot->ItemType == ITEM_NONE)
-                                        {
-                                            *PlayerItemSlot = *ItemFromPickup;
-                                            ItemFromPickup->ItemType = ITEM_NONE;
-                                            TurnUsed = true;
-                                            break;
-                                        }
+                                        // TODO: This is kind of a waste
+                                        RemoveItemFromEntityInventory(ItemFromPickup, ItemPickup);
                                     }
                                 }
                             }
 
-                            int I;
-                            for (I = 0; I < INVENTORY_SLOTS_PER_ENTITY; I++)
-                            {
-                                if (ItemPickup->Inventory[I].ItemType > ITEM_NONE)
-                                {
-                                    break;
-                                }
-                            }
-
-                            if (I < INVENTORY_SLOTS_PER_ENTITY)
-                            {
-                                ItemPickup->Glyph = ItemPickup->Inventory[I].Glyph;
-                                ItemPickup->Color = ItemPickup->Inventory[I].Color;
-                            }
-                            else
-                            {
-                                ItemPickup->Health = 0;
-                            }
+                            RefreshItemPickupState(ItemPickup);
                         }
                         
                         ItemPickup = ItemPickup->Next;
+                    }
+                }
+                else if (PlayerRequestedItemDrop)
+                {
+                    if (Player->Inventory)
+                    {
+                        entity ItemPickupTestTemplate = {};
+                        ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
+                        entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate, &GameState->WorldArena);
+                        Assert(ItemPickup->Inventory);
+
+                        item *ItemFromInventory = Player->Inventory;
+                        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromInventory++)
+                        {
+                            if (ItemFromInventory->ItemType > ITEM_NONE)
+                            {
+                                if (AddItemToEntityInventory(ItemFromInventory, ItemPickup))
+                                {
+                                    RemoveItemFromEntityInventory(ItemFromInventory, Player);
+                                }
+                            }
+                        }
+
+                        RefreshItemPickupState(ItemPickup);
                     }
                 }
                 else if (PlayerRequestedSkipTurn)
