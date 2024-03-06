@@ -56,8 +56,12 @@ static_i b32
 Win32LoadGameCode(game_code *GameCode)
 {
     CopyFile(GameCode->SourceDllPath.D, GameCode->TempDllPath.D, FALSE);
-    
+
     GameCode->Dll = LoadLibraryA(GameCode->TempDllPath.D);
+    if ((void *) GameCode->PrevDll != NULL && ((void *) GameCode->Dll != (void *) GameCode->PrevDll))
+    {
+        Breakpoint;
+    }
     
     if (GameCode->Dll)
     {
@@ -77,6 +81,7 @@ Win32UnloadGameCode(game_code *GameCode)
 {
     if (GameCode->Dll)
     {
+        GameCode->PrevDll = GameCode->Dll;
         FreeLibrary(GameCode->Dll);
         GameCode->Dll = 0;
     }

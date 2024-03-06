@@ -100,7 +100,7 @@ struct entity
     int Sera;
 
     int HaimaBonus;
-    
+
     item *Inventory;
 
     entity *Next;

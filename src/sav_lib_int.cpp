@@ -56,6 +56,7 @@ struct input_state
 struct game_code
 {
     b32 IsValid;
+    HMODULE PrevDll;
     HMODULE Dll;
     FILETIME LastWriteTime;
 
