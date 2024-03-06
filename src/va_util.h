@@ -6,10 +6,11 @@
 #define static_i static
 
 #ifdef SAV_DEBUG
-  #define Assert(Expression) if (!(Expression)) { *(int *) 0 = 0; }
+  void __debugbreak(); // usually in <intrin.h>
+//  #define Assert(Expression) if (!(Expression)) { *(int *) 0 = 0; }
+  #define Assert(Expression) if (!(Expression)) { __debugbreak(); }
   #define InvalidCodePath Assert(!"Invalid Code Path")
   #define Noop { volatile int X = 0; }
-  void __debugbreak(); // usually in <intrin.h>
   #define Breakpoint __debugbreak()
 #else
   #define Assert(Expression)

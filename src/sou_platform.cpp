@@ -31,11 +31,6 @@ int main(int argc, char **argv)
 
         PollEvents(&ShouldQuit);
 
-        if (KeyPressed(SDL_SCANCODE_ESCAPE))
-        {
-            ShouldQuit = true;
-        }
-
         if (KeyPressed(SDL_SCANCODE_F5))
         {
             DumpGameMemory(GameMemory);

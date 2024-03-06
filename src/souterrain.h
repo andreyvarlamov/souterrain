@@ -196,6 +196,7 @@ enum run_state
     RUN_STATE_PROCESSING_PLAYER,
     RUN_STATE_PROCESSING_ENTITIES,
     RUN_STATE_INVENTORY_MENU,
+    RUN_STATE_PICKUP_MENU,
     RUN_STATE_COUNT,
 };
 
@@ -250,6 +251,8 @@ struct game_state
     run_state RunState;
 
     item *PlayerRequestedDropItem;
+    item *PlayerRequestedPickupItem;
+    entity *PlayerRequestedPickupItemItemPickup;
 };
 
 static_g vec2i DIRECTIONS[] = {
