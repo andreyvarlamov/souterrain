@@ -678,7 +678,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             b32 PlayerRequestedItemPickup = false;
             b32 PlayerRequestedItemDrop = false;
             b32 PlayerRequestedTeleport = false;
-    
+            b32 PlayerRequestedInventoryOpen = false;
+            
             if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_E)) PlayerRequestedDP = Vec2I( 1, -1);
@@ -691,7 +692,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressed(SDL_SCANCODE_G)) PlayerRequestedItemPickup = true;
             if (KeyPressed(SDL_SCANCODE_R)) PlayerRequestedItemDrop = true;
             if (KeyPressed(SDL_SCANCODE_T)) PlayerRequestedTeleport = true;
-
+            if (KeyPressed(SDL_SCANCODE_I)) PlayerRequestedInventoryOpen = true;
+            
             if (KeyPressed(SDL_SCANCODE_F))
             {
                 GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
@@ -705,7 +707,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 break;
             }
 
-            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemPickup || PlayerRequestedItemDrop || PlayerRequestedTeleport)
+            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemPickup || PlayerRequestedItemDrop || PlayerRequestedTeleport || PlayerRequestedInventoryOpen)
             {
                 b32 TurnUsed = false;
                 if (PlayerRequestedItemPickup)
@@ -724,6 +726,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                     {
                                         // TODO: This is kind of a waste
                                         RemoveItemFromEntityInventory(ItemFromPickup, ItemPickup);
+                                        TurnUsed = true;
                                     }
                                 }
                             }
@@ -751,6 +754,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                 if (AddItemToEntityInventory(ItemFromInventory, ItemPickup))
                                 {
                                     RemoveItemFromEntityInventory(ItemFromInventory, Player);
+                                    TurnUsed = true;
                                 }
                             }
                         }
@@ -761,6 +765,10 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 else if (PlayerRequestedSkipTurn)
                 {
                     TurnUsed = true;
+                }
+                else if (PlayerRequestedInventoryOpen)
+                {
+                    GameState->RunState = RUN_STATE_INVENTORY_MENU;
                 }
                 else if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedTeleport)
                 {
@@ -845,6 +853,28 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (ActiveEntity == Player)
             {
                 GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+            }
+        } break;
+
+        case RUN_STATE_INVENTORY_MENU:
+        {
+            if (KeyPressed(SDL_SCANCODE_I)) GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+
+            if (GameState->PlayerRequestedDropItem && GameState->PlayerRequestedDropItem->ItemType != ITEM_NONE)
+            {
+                entity ItemPickupTestTemplate = {};
+                ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
+                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate, &GameState->WorldArena);
+                Assert(ItemPickup->Inventory);
+
+                if (AddItemToEntityInventory(GameState->PlayerRequestedDropItem, ItemPickup))
+                {
+                    RemoveItemFromEntityInventory(GameState->PlayerRequestedDropItem, Player);
+                }
+
+                GameState->PlayerRequestedDropItem = NULL;
+
+                RefreshItemPickupState(ItemPickup);
             }
         } break;
 
@@ -1058,6 +1088,44 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                        false, VA_BLACK,
                        &GameState->TrArenaA);
         }
+
+        // NOTE: Inventory UI
+        if (GameState->RunState == RUN_STATE_INVENTORY_MENU)
+        {
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            f32 InventoryWidth = 500.0f;
+            f32 InventoryHeight = 900.0f;
+            rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
+                                      GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
+                                      InventoryWidth,
+                                      InventoryHeight);
+            DrawRect(InventoryRect, ColorAlpha(VA_SLATEGRAY, 240));
+
+            item *InventoryItem = Player->Inventory;
+            f32 LineX = InventoryRect.X + 10.0f;
+            f32 LineY = InventoryRect.Y + 10.0f;
+            for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, InventoryItem++)
+            {
+                if (InventoryItem->ItemType != ITEM_NONE)
+                {
+                    if (GuiButtonRect(Rect(LineX, LineY, InventoryWidth - 20.0f, 40.0f)) == SDL_BUTTON_RIGHT)
+                    {
+                        GameState->PlayerRequestedDropItem = InventoryItem;
+                    }
+
+                    DrawString(TextFormat("%s", InventoryItem->Name),
+                               GameState->BodyFont,
+                               GameState->BodyFont->PointSize,
+                               LineX, LineY, 0,
+                               VA_BLACK,
+                               false, VA_BLACK,
+                               &GameState->TrArenaA);
+
+                    LineY += 40.0f;
+                }
+            }
+        }
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
     EndTextureMode();
 

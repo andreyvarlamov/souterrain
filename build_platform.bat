@@ -13,7 +13,7 @@ set copt=/I%incdir% /MDd /nologo /FC /GR- /Z7 /Od /Oi /Ob1
 
 set cwopt=/WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4127
 
-set lopt=/libpath:%libsdir% /debug /opt:ref /incremental:no /subsystem:console
+set lopt=/libpath:%libsdir% /debug /opt:ref /incremental:no /subsystem:console /dynamicbase:no /fixed
 
 set llib=sav_lib.lib
 

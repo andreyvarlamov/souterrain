@@ -9,6 +9,15 @@
 
 #include "souterrain.h"
 
+TEMPLATE_FUNC void
+Template_DUMMY()
+#ifdef TEMPLATE_EXPORTS
+{
+}
+#else
+;
+#endif
+
 TEMPLATE_FUNC entity
 Template_PumiceWall()
 #ifdef TEMPLATE_EXPORTS
@@ -89,6 +98,86 @@ Template_AetherFly()
     Template.RegenActionCost = 1500;
     Template.RegenAmount = 1;
     
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC item
+Template_Sword()
+#ifdef TEMPLATE_EXPORTS
+{
+    item Template = {};
+    
+    Template.ItemType = ITEM_MELEE;
+    Template.Glyph = ')';
+    Template.Color = VA_RED;
+    Template.Name = "Short sword";
+    Template.Description = "A sword";
+
+    Template.HaimaBonus = 0;
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC item
+Template_LeatherCuirass()
+#ifdef TEMPLATE_EXPORTS
+{
+    item Template = {};
+    
+    Template.ItemType = ITEM_CHEST;
+    Template.Glyph = '<';
+    Template.Color = VA_BROWN;
+    Template.Name = "Leather Cuirass";
+    Template.Description = "A leather cuirass";
+
+    Template.HaimaBonus = 0;
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC item
+Template_HaimaPotion()
+#ifdef TEMPLATE_EXPORTS
+{
+    item Template = {};
+    
+    Template.ItemType = ITEM_CONSUMABLE;
+    Template.Glyph = '!';
+    Template.Color = VA_YELLOW;
+    Template.Name = "Haima Potion";
+    Template.Description = "A haima potion";
+
+    Template.HaimaBonus = 5;
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC item
+Template_ShortBow()
+#ifdef TEMPLATE_EXPORTS
+{
+    item Template = {};
+    
+    Template.ItemType = ITEM_RANGED;
+    Template.Glyph = '(';
+    Template.Color = VA_GREEN;
+    Template.Name = "Short Bow";
+    Template.Description = "A short bow";
+
+    Template.HaimaBonus = 0;
+
     return Template;
 }
 #else

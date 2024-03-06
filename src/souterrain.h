@@ -59,6 +59,9 @@ struct item
     u8 Glyph;
     color Color;
 
+    const char *Name;
+    const char *Description;
+
     int HaimaBonus;
 };
 
@@ -192,6 +195,7 @@ enum run_state
     RUN_STATE_NONE = 0,
     RUN_STATE_PROCESSING_PLAYER,
     RUN_STATE_PROCESSING_ENTITIES,
+    RUN_STATE_INVENTORY_MENU,
     RUN_STATE_COUNT,
 };
 
@@ -244,6 +248,8 @@ struct game_state
     b32 IgnoreFieldOfView;
 
     run_state RunState;
+
+    item *PlayerRequestedDropItem;
 };
 
 static_g vec2i DIRECTIONS[] = {

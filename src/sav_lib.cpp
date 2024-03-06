@@ -1904,7 +1904,7 @@ CheckPointInRect(vec2 P, rect R)
     return (P.X > MinR.X && P.Y > MinR.Y && P.X < MaxR.X && P.Y < MaxR.Y);
 }
 
-b32
+int
 GuiButtonRect(rect R)
 {
     vec2 MouseP = GetMouseLogicalPos();
@@ -1913,12 +1913,13 @@ GuiButtonRect(rect R)
     if (MouseInRect)
     {
         color C = ColorAlpha(VA_BLACK, 128);
-        if (MouseDown(SDL_BUTTON_LEFT))
+        if (MouseDown(SDL_BUTTON_LEFT) || MouseDown(SDL_BUTTON_RIGHT))
         {
             C = ColorAlpha(VA_BLACK, 200);
         }
         DrawRect(R, C);
-        return MouseReleased(SDL_BUTTON_LEFT);
+        int MouseButtonReleased = (MouseReleased(SDL_BUTTON_LEFT) ? SDL_BUTTON_LEFT : (MouseReleased(SDL_BUTTON_RIGHT) ? SDL_BUTTON_RIGHT : 0));
+        return MouseButtonReleased;
     }
 
     return false;

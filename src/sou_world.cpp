@@ -531,27 +531,16 @@ GenerateWorld(game_state *GameState)
     ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
     entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
 
-    ItemPickupTest->Inventory[0].ItemType = ITEM_MELEE;
-    ItemPickupTest->Inventory[0].Glyph = ')';
-    ItemPickupTest->Inventory[0].Color = VA_BLUE;
-
-    ItemPickupTest->Inventory[1].ItemType = ITEM_CHEST;
-    ItemPickupTest->Inventory[1].Glyph = '<';
-    ItemPickupTest->Inventory[1].Color = VA_BROWN;
+    ItemPickupTest->Inventory[0] = Template_Sword();
+    ItemPickupTest->Inventory[1] = Template_LeatherCuirass();
 
     ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
     
     ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
 
-    ItemPickupTest->Inventory[0].ItemType = ITEM_CONSUMABLE;
-    ItemPickupTest->Inventory[0].Glyph = '!';
-    ItemPickupTest->Inventory[0].Color = VA_YELLOW;
-    ItemPickupTest->Inventory[0].HaimaBonus = 5;
-
-    ItemPickupTest->Inventory[1].ItemType = ITEM_RANGED;
-    ItemPickupTest->Inventory[1].Glyph = '(';
-    ItemPickupTest->Inventory[1].Color = VA_GREEN;
+    ItemPickupTest->Inventory[0] = Template_HaimaPotion();
+    ItemPickupTest->Inventory[1] = Template_ShortBow();
 
     ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
