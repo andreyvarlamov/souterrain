@@ -1002,6 +1002,154 @@ IsInLineOfSight(world *World, vec2i Start, vec2i End, int MaxRange)
     return false;
 }
 
+b32
+IsInRangedAttackRange(world *World, vec2i Start, vec2i End, int MaxRange)
+{
+    if (VecLengthSq(End - Start) <= MaxRange*MaxRange)
+    {
+        int CurrentX = Start.X;
+        int CurrentY = Start.Y;
+        int EndX = End.X;
+        int EndY = End.Y;
+    
+        int DeltaX = EndX - CurrentX;
+        int IX = ((DeltaX > 0) - (DeltaX < 0));
+        DeltaX = Abs(DeltaX) << 1;
+
+        int DeltaY = EndY - CurrentY;
+        int IY = ((DeltaY > 0) - (DeltaY < 0));
+        DeltaY = Abs(DeltaY) << 1;
+
+        if (DeltaX >= DeltaY)
+        {
+            int Error = (DeltaY - (DeltaY >> 1));
+            while (CurrentX != EndX)
+            {
+                if ((Error > 0) || (!Error && (IX > 0)))
+                {
+                    Error -= DeltaX;
+                    CurrentY += IY;
+                }
+
+                Error += DeltaY;
+                CurrentX += IX;
+
+                vec2i TestPos = Vec2I(CurrentX, CurrentY);
+                collision_info Col = CheckCollisions(World, TestPos);
+                
+                // NOTE: If encountered non npc collision - it can't be hit in ranged, even if it's our target
+                if (IsTileOpaque(World, TestPos) ||
+                    ((Col.Collided && Col.Entity == NULL) ||
+                     (Col.Entity && Col.Entity->Type != ENTITY_NPC)))
+                {
+                    return false;
+                }
+
+                if (TestPos == End) return true;
+                
+                // NOTE: If encountered npc collision - it can be hit in ranged,
+                //       so if it was the target we would've returned true,
+                //       but if it's not, don't continue tracing line beyond that
+                if (Col.Entity && Col.Entity->Type == ENTITY_NPC) return false;
+            }
+        }
+        else
+        {
+            int Error = (DeltaX - (DeltaY >> 1));
+            while (CurrentY != EndY)
+            {
+                if ((Error > 0) || (!Error && (IY > 0)))
+                {
+                    Error -= DeltaY;
+                    CurrentX += IX;
+                }
+
+                Error += DeltaX;
+                CurrentY += IY;
+
+                vec2i TestPos = Vec2I(CurrentX, CurrentY);
+                collision_info Col = CheckCollisions(World, TestPos);
+
+                // NOTE: If encountered non npc collision - it can't be hit in ranged, even if it's our target
+                if (IsTileOpaque(World, TestPos) ||
+                    ((Col.Collided && Col.Entity == NULL) ||
+                     (Col.Entity && Col.Entity->Type != ENTITY_NPC)))
+                {
+                    return false;
+                }
+
+                if (TestPos == End) return true;
+                
+                // NOTE: If encountered npc collision - it can be hit in ranged,
+                //       so if it was the target we would've returned true,
+                //       but if it's not, don't continue tracing line beyond that
+                if (Col.Entity && Col.Entity->Type == ENTITY_NPC) return false;
+            }
+        }
+    }
+
+    return false;
+}
+
+vec2i
+FurthestInLineOfSight(world * World, vec2i Start, vec2i End, int MaxRange)
+{
+    int MaxRangeSq = MaxRange*MaxRange;
+    int CurrentX = Start.X;
+    int CurrentY = Start.Y;
+    int EndX = End.X;
+    int EndY = End.Y;
+    
+    int DeltaX = EndX - CurrentX;
+    int IX = ((DeltaX > 0) - (DeltaX < 0));
+    DeltaX = Abs(DeltaX) << 1;
+
+    int DeltaY = EndY - CurrentY;
+    int IY = ((DeltaY > 0) - (DeltaY < 0));
+    DeltaY = Abs(DeltaY) << 1;
+
+    if (DeltaX >= DeltaY)
+    {
+        int Error = (DeltaY - (DeltaY >> 1));
+        while (CurrentX != EndX)
+        {
+            if ((Error > 0) || (!Error && (IX > 0)))
+            {
+                Error -= DeltaX;
+                CurrentY += IY;
+            }
+
+            Error += DeltaY;
+            CurrentX += IX;
+
+            vec2i TestPos = Vec2I(CurrentX, CurrentY);
+            b32 OutOfRange = (CurrentX - Start.X)*(CurrentX - Start.X) + (CurrentY - Start.Y)*(CurrentY - Start.Y) >= MaxRangeSq;
+            if (TestPos == End || OutOfRange || IsTileOpaque(World, TestPos) || CheckCollisions(World, TestPos).Collided) return TestPos;
+        }
+    }
+    else
+    {
+        int Error = (DeltaX - (DeltaY >> 1));
+        while (CurrentY != EndY)
+        {
+            if ((Error > 0) || (!Error && (IY > 0)))
+            {
+                Error -= DeltaY;
+                CurrentX += IX;
+            }
+
+            Error += DeltaX;
+            CurrentY += IY;
+
+            vec2i TestPos = Vec2I(CurrentX, CurrentY);
+            b32 OutOfRange = (CurrentX - Start.X)*(CurrentX - Start.X) + (CurrentY - Start.Y)*(CurrentY - Start.Y) >= MaxRangeSq;
+            if (TestPos == End || OutOfRange || IsTileOpaque(World, TestPos) || CheckCollisions(World, TestPos).Collided) return TestPos;
+        }
+    }
+
+    return Start;
+}
+
 // SECTION: ENTITY TURN QUEUE
 inline entity_queue_node
 MakeEntityQueueNode(entity *Entity, int Cost)

@@ -80,6 +80,7 @@ struct entity
     int ActionCost;
 
     int ViewRange;
+    int RangedRange;
     u8 *FieldOfView;
 
     u8 NpcState;

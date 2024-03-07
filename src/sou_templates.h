@@ -46,6 +46,7 @@ Template_Player()
     Template.Color = VA_YELLOW;
     Template.Glyph = '@';
     Template.ViewRange = 30;
+    Template.RangedRange = 5;
     Template.Name = "Player";
     Template.Description = "After Derval's disappearance you awake in the Souterrain. You've read about this place in the dusty tomes kept in St Catherine's Library. You remember one thing: the only way is down.";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);

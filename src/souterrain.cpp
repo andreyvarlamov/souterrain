@@ -1034,8 +1034,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             
             if (MouseReleased(SDL_BUTTON_LEFT))
             {
-                int RangedAttackRange = 5;
-                if (IsInLineOfSight(World, Player->Pos, MouseTileP, RangedAttackRange))
+                if (IsInRangedAttackRange(World, Player->Pos, MouseTileP, Player->RangedRange))
                 {
                     entity *EntityToHit = GetEntitiesOfTypeAt(MouseTileP, ENTITY_NPC, World);
                     if (EntityToHit)
@@ -1044,7 +1043,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                         GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
                     }
                 }
-
             }
         } break;
 
@@ -1104,7 +1102,18 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         if (GameState->RunState == RUN_STATE_RANGED_ATTACK)
         {
-            DrawRect(World, MouseTileP, ColorAlpha(VA_RED, 150));
+            for (int Y = Player->Pos.Y - Player->RangedRange; Y <= Player->Pos.Y + Player->RangedRange; Y++)
+            {
+                for (int X = Player->Pos.X - Player->RangedRange; X <= Player->Pos.X + Player->RangedRange; X++)
+                {
+                    vec2i P = Vec2I(X, Y);
+                    if (IsInRangedAttackRange(World, Player->Pos, P, Player->RangedRange))
+                    {
+                        color C = (P == MouseTileP) ? ColorAlpha(VA_RED, 200) : ColorAlpha(VA_RED, 150);
+                        DrawRect(World, P, C);
+                    }
+                }
+            }
         }
     }
     EndCameraMode(); EndTextureMode();
@@ -1158,15 +1167,18 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             color PortraitColor = (((f32) Player->Health / (f32) Player->MaxHealth > 0.3f) ? VA_WHITE : Color(0xAE4642FF));
 
             DrawTexture(GameState->PlayerPortraitTex, Rect(10, 860, 160, 160), PortraitColor);
-            vec2 PlayerPxP = Vec2(Player->Pos.X * World->TilePxW + World->TilePxW * 0.5f,
-                                    Player->Pos.Y * World->TilePxH + World->TilePxH * 0.5f);
-            vec2 EyesOffset = MouseWorldPxP - PlayerPxP;
-            f32 MaxAwayFromPlayer = 200.0f;
-            EyesOffset = (VecLengthSq(EyesOffset) > Square(MaxAwayFromPlayer) ?
-                          VecNormalize(EyesOffset) * MaxAwayFromPlayer :
-                          EyesOffset);
-            EyesOffset *= 0.05f;
-            DrawTexture(GameState->PlayerPortraitEyesTex, Rect(10.0f + EyesOffset.X, 860.0f, 160.0f, 160.0f), PortraitColor);
+            if (Player->Health > 0)
+            {
+                vec2 PlayerPxP = Vec2(Player->Pos.X * World->TilePxW + World->TilePxW * 0.5f,
+                                      Player->Pos.Y * World->TilePxH + World->TilePxH * 0.5f);
+                vec2 EyesOffset = MouseWorldPxP - PlayerPxP;
+                f32 MaxAwayFromPlayer = 200.0f;
+                EyesOffset = (VecLengthSq(EyesOffset) > Square(MaxAwayFromPlayer) ?
+                              VecNormalize(EyesOffset) * MaxAwayFromPlayer :
+                              EyesOffset);
+                EyesOffset *= 0.05f;
+                DrawTexture(GameState->PlayerPortraitEyesTex, Rect(10.0f + EyesOffset.X, 860.0f, 160.0f, 160.0f), PortraitColor);
+            }
 
             DrawString(TextFormat("HP: %d/%d", World->PlayerEntity->Health, World->PlayerEntity->MaxHealth),
                        GameState->TitleFont,
