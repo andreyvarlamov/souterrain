@@ -168,6 +168,7 @@ SAV_API void DeleteShader(sav_shader *Shader);
 SAV_API void BeginShaderMode(sav_shader Shader);
 SAV_API void EndShaderMode();
 SAV_API void SetUniformMat4(const char *UniformName, f32 *Value);
+SAV_API void SetUniformVec3(const char *UniformName, f32 *Value);
 SAV_API void SetUniformVec4(const char *UniformName, f32 *Value);
 SAV_API void SetUniformI(const char *UniformName, int Value);
 SAV_API void BindTextureSlot(int Slot, sav_texture Texture);

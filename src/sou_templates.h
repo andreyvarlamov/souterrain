@@ -43,7 +43,7 @@ Template_Player()
 {
     entity Template = {};
     Template.Type = ENTITY_PLAYER;
-    Template.Color = VA_MAROON;
+    Template.Color = VA_YELLOW;
     Template.Glyph = '@';
     Template.ViewRange = 30;
     Template.Name = "Player";

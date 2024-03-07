@@ -898,6 +898,13 @@ SetUniformMat4(const char *UniformName, f32 *Value)
 }
 
 void
+SetUniformVec3(const char *UniformName, f32 *Value)
+{
+    int UniformLocation = GetUniformLocation(gGlState.CurrentShader, UniformName);
+    glUniform3fv(UniformLocation, 1, Value);
+}
+
+void
 SetUniformVec4(const char *UniformName, f32 *Value)
 {
     int UniformLocation = GetUniformLocation(gGlState.CurrentShader, UniformName);

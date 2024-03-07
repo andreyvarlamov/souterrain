@@ -197,6 +197,7 @@ enum run_state
     RUN_STATE_PROCESSING_ENTITIES,
     RUN_STATE_INVENTORY_MENU,
     RUN_STATE_PICKUP_MENU,
+    RUN_STATE_RANGED_ATTACK,
     RUN_STATE_COUNT,
 };
 
@@ -257,11 +258,14 @@ struct game_state
     sav_font *TitleFont;
     sav_font *BodyFont;
     glyph_atlas GlyphAtlas;
+    sav_texture GlyphAtlasNormalTex;
     sav_texture VigTex;
     sav_texture GroundBrushTex;
     rect GroundBrushRect; // TODO: tex + rect, atlas idiom?
     sav_shader GroundShader;
+    sav_shader Glyph3DShader;
     sav_texture PlayerPortraitTex;
+    sav_texture PlayerPortraitEyesTex;
 
     music_stream BackgroundMusic;
     camera_2d Camera;
@@ -287,6 +291,8 @@ struct game_state
     entity *PlayerRequestedPickupItemItemPickup;
 
     inspect_state InspectState;
+
+    entity *EntityToHit;
 };
 
 static_g vec2i DIRECTIONS[] = {
