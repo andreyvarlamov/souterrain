@@ -855,7 +855,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     if (FoundPosition && MoveEntity(World, World->PlayerEntity, NewP, &TurnUsed))
                     {
                         UpdateCameraToWorldTarget(&GameState->Camera, World, NewP);
-                        PlayerFovDirty = true;
                     }
                 }
             }
@@ -875,6 +874,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     World->PlayerEntity->LastHealTurn = World->TurnsPassed;
                     TraceLog("Player regens %d health.", RegenAmount);
                 }
+
+                PlayerFovDirty = true;
 
                 World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
                 ActiveEntity = EntityTurnQueuePeek(World);
@@ -1053,6 +1054,46 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         };
     }
 
+
+    // SECTION: GAME LOGIC POST UPDATE
+    // NOTE: Process mined walls to add new walls behind them
+    {
+        entity *Entity = World->Entities;
+        for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
+        {
+            if (Entity->Type == ENTITY_WALL && EntityIsDead(Entity))
+            {
+                vec2i EntityP = Entity->Pos;
+                for (int Dir = 0; Dir < 8; Dir++)
+                {
+                    vec2i NeighborP = EntityP + DIRECTIONS[Dir];
+                    if (IsPInBounds(NeighborP, World) && !IsPInitialized(NeighborP, World))
+                    {
+                        InitializeP(NeighborP, World);
+                        entity WallTemplate = Template_PumiceWall();
+                        AddEntity(World, NeighborP, &WallTemplate, &GameState->WorldArena);
+                    }
+                }
+            }
+        }
+    }
+
+    // NOTE: Delete dead entities
+    {
+        entity *Entity = World->Entities;
+        for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
+        {
+            if (EntityExists(Entity) && EntityIsDead(Entity))
+            {
+                if (Entity->ActionCost > 0)
+                {
+                    EntityTurnQueueDelete(World, Entity);
+                }
+                DeleteEntity(World, Entity);
+            }
+        }
+    }
+
     // NOTE: Update player FOV and darkness levels
     if (PlayerFovDirty || FirstFrame)
     {
@@ -1061,7 +1102,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             memset(World->PlayerEntity->FieldOfView, 0, World->Width * World->Height * sizeof(World->PlayerEntity->FieldOfView[0]));
             CalculateExhaustiveFOV(World, World->PlayerEntity->Pos, World->PlayerEntity->FieldOfView, World->PlayerEntity->ViewRange);
         }
-    
+
         for (int i = 0; i < World->Width * World->Height; i++)
         {
             if (World->DarknessLevels[i] == DARKNESS_IN_VIEW)
@@ -1073,22 +1114,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             {
                 World->DarknessLevels[i] = DARKNESS_IN_VIEW;
             }
-        }
-    }
-
-    // SECTION: GAME LOGIC POST UPDATE
-    // NOTE: Delete dead entities
-    for (int i = 0; i < World->EntityUsedCount; i++)
-    {
-        entity *Entity = World->Entities + i;
-
-        if (EntityExists(Entity) && EntityIsDead(Entity))
-        {
-            if (Entity->ActionCost > 0)
-            {
-                EntityTurnQueueDelete(World, Entity);
-            }
-            DeleteEntity(World, Entity);
         }
     }
 

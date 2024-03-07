@@ -18,7 +18,7 @@ void main()
     normalTexel = normalize(normalTexel * 2.0 - 1.0);
     vec3 norm = vec3(normalTexel.r, -normalTexel.g, normalTexel.b);
 
-    float ambientStrength = 0.1;
+    float ambientStrength = 0.2;
     vec3 lightDir = normalize(lightPos - fragPos);
     float diffuseStrength = max(dot(norm, lightDir), 0.0);
 

@@ -531,16 +531,17 @@ GenerateWorld(game_state *GameState)
     ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
     entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
 
-    ItemPickupTest->Inventory[0] = Template_Sword();
-    ItemPickupTest->Inventory[1] = Template_LeatherCuirass();
+    ItemPickupTest->Inventory[0] = Template_HaimaPotion();
+    ItemPickupTest->Inventory[1] = Template_ShortBow();
 
     ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
     
     ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
 
-    ItemPickupTest->Inventory[0] = Template_HaimaPotion();
-    ItemPickupTest->Inventory[1] = Template_ShortBow();
+    ItemPickupTest->Inventory[0] = Template_ShoddyPickaxe();
+    ItemPickupTest->Inventory[1] = Template_Sword();
+    ItemPickupTest->Inventory[2] = Template_LeatherCuirass();
 
     ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
@@ -567,7 +568,7 @@ GenerateWorld(game_state *GameState)
 #else
     int EnemyCount = 0;
     int AttemptCount = 0;
-    int EnemiesToAdd = 15;
+    int EnemiesToAdd = 3;
     int MaxAttempts = 500;
     while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
     {
@@ -1091,65 +1092,6 @@ IsInRangedAttackRange(world *World, vec2i Start, vec2i End, int MaxRange)
     return false;
 }
 
-vec2i
-FurthestInLineOfSight(world * World, vec2i Start, vec2i End, int MaxRange)
-{
-    int MaxRangeSq = MaxRange*MaxRange;
-    int CurrentX = Start.X;
-    int CurrentY = Start.Y;
-    int EndX = End.X;
-    int EndY = End.Y;
-    
-    int DeltaX = EndX - CurrentX;
-    int IX = ((DeltaX > 0) - (DeltaX < 0));
-    DeltaX = Abs(DeltaX) << 1;
-
-    int DeltaY = EndY - CurrentY;
-    int IY = ((DeltaY > 0) - (DeltaY < 0));
-    DeltaY = Abs(DeltaY) << 1;
-
-    if (DeltaX >= DeltaY)
-    {
-        int Error = (DeltaY - (DeltaY >> 1));
-        while (CurrentX != EndX)
-        {
-            if ((Error > 0) || (!Error && (IX > 0)))
-            {
-                Error -= DeltaX;
-                CurrentY += IY;
-            }
-
-            Error += DeltaY;
-            CurrentX += IX;
-
-            vec2i TestPos = Vec2I(CurrentX, CurrentY);
-            b32 OutOfRange = (CurrentX - Start.X)*(CurrentX - Start.X) + (CurrentY - Start.Y)*(CurrentY - Start.Y) >= MaxRangeSq;
-            if (TestPos == End || OutOfRange || IsTileOpaque(World, TestPos) || CheckCollisions(World, TestPos).Collided) return TestPos;
-        }
-    }
-    else
-    {
-        int Error = (DeltaX - (DeltaY >> 1));
-        while (CurrentY != EndY)
-        {
-            if ((Error > 0) || (!Error && (IY > 0)))
-            {
-                Error -= DeltaY;
-                CurrentX += IX;
-            }
-
-            Error += DeltaX;
-            CurrentY += IY;
-
-            vec2i TestPos = Vec2I(CurrentX, CurrentY);
-            b32 OutOfRange = (CurrentX - Start.X)*(CurrentX - Start.X) + (CurrentY - Start.Y)*(CurrentY - Start.Y) >= MaxRangeSq;
-            if (TestPos == End || OutOfRange || IsTileOpaque(World, TestPos) || CheckCollisions(World, TestPos).Collided) return TestPos;
-        }
-    }
-
-    return Start;
-}
-
 // SECTION: ENTITY TURN QUEUE
 inline entity_queue_node
 MakeEntityQueueNode(entity *Entity, int Cost)
@@ -1301,6 +1243,36 @@ EntityAttacksEntity(entity *Attacker, entity *Defender, world *World)
 }
 
 b32
+EntityAttacksWall(entity *Entity, entity *Wall, world *World)
+{
+    item *Pickaxe = IsItemTypeInEntityInventory(ITEM_PICKAXE, Entity);
+    if (Pickaxe)
+    {
+        Wall->Health -= Pickaxe->WallDamage;
+        if (Wall->Health > 0)
+        {
+            LogEntityAction(Entity, World,
+                            "%s (%d) hits %s (%d) with a %s. Wall still has %d/%d health.",
+                            Entity->Name, Entity->DebugID,
+                            Wall->Name, Wall->DebugID,
+                            Pickaxe->Name, Wall->Health, Wall->MaxHealth);
+        }
+        else
+        {
+            LogEntityAction(Entity, World,
+                            "%s (%d) hits %s (%d) with a %s, breaking the wall.",
+                            Entity->Name, Entity->DebugID,
+                            Wall->Name, Wall->DebugID,
+                            Pickaxe->Name);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+b32
 ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World)
 {
     switch(ActiveEntity->Type)
@@ -1315,6 +1287,11 @@ ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World
                 {
                     EntityAttacksEntity(ActiveEntity, PassiveEntity, World);
                     return true;
+                } break;
+
+                case ENTITY_WALL:
+                {
+                    return EntityAttacksWall(ActiveEntity, PassiveEntity, World);
                 } break;
 
                 default: break;

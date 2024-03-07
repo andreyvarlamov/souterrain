@@ -24,7 +24,7 @@ Template_PumiceWall()
 {
     entity Template = {};
     
-    Template.Type = ENTITY_STATIC;
+    Template.Type = ENTITY_WALL;
     Template.Color = VA_SLATEGRAY;
     Template.Glyph = 11 + 16*13;
     Template.Name = "Pumice Wall";
@@ -114,8 +114,8 @@ Template_Sword()
     Template.ItemType = ITEM_MELEE;
     Template.Glyph = ')';
     Template.Color = VA_RED;
-    Template.Name = "Short sword";
-    Template.Description = "A sword";
+    Template.Name = "Old Ceremonial Sword";
+    Template.Description = "A rusty ceremonial sword. It was used for pharmakoi sacrifice in the age of Souwarad Expansion.";
 
     Template.HaimaBonus = 0;
 
@@ -133,7 +133,7 @@ Template_LeatherCuirass()
     
     Template.ItemType = ITEM_CHEST;
     Template.Glyph = '<';
-    Template.Color = VA_BROWN;
+    Template.Color = VA_CHOCOLATE;
     Template.Name = "Leather Cuirass";
     Template.Description = "A leather cuirass";
 
@@ -173,11 +173,31 @@ Template_ShortBow()
     
     Template.ItemType = ITEM_RANGED;
     Template.Glyph = '(';
-    Template.Color = VA_GREEN;
+    Template.Color = VA_BROWN;
     Template.Name = "Short Bow";
-    Template.Description = "A short bow";
+    Template.Description = "A very common kind of short bow used by Ujik poachers to hunt game.";
 
     Template.HaimaBonus = 0;
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC item
+Template_ShoddyPickaxe()
+#ifdef TEMPLATE_EXPORTS
+{
+    item Template = {};
+    
+    Template.ItemType = ITEM_PICKAXE;
+    Template.Glyph = '?';
+    Template.Color = VA_DIMGREY;
+    Template.Name = "Shoddy Pickaxe";
+    Template.Description = "A rusty old pickaxe. Must have been left by a careless miner in the age of Souward Expansion.";
+
+    Template.WallDamage = 10;
 
     return Template;
 }
@@ -190,5 +210,7 @@ Template_ShortBow()
 // TODO: Trees that are seemingly inanimate, but wake up after a delay
 // TODO: Derval - main boss; Derval's ring - goal
 // TODO: A vagaband - maybe boss? or friendly npc???????????????????????
+// TODO: Plutonium sword
+// TODO: Black compass
 
 #endif

@@ -22,7 +22,7 @@ enum entity_flags
 enum entity_type
 {
     ENTITY_NONE = 0,
-    ENTITY_STATIC,
+    ENTITY_WALL,
     ENTITY_NPC,
     ENTITY_PLAYER,
     ENTITY_ITEM_PICKUP,
@@ -48,6 +48,7 @@ enum item_type
     ITEM_ARMS,
     ITEM_LEGS,
     ITEM_CONSUMABLE,
+    ITEM_PICKAXE,
     ITEM_COUNT
 };
 
@@ -61,6 +62,8 @@ struct item
 
     const char *Name;
     const char *Description;
+
+    int WallDamage;
 
     int HaimaBonus;
 };
@@ -292,7 +295,7 @@ struct game_state
     entity *PlayerRequestedPickupItemItemPickup;
 
     inspect_state InspectState;
-
+    
     entity *EntityToHit;
 };
 
@@ -367,10 +370,27 @@ GetWorldCameraRect(camera_2d *Camera)
 }
     
 inline b32
+IsPInBounds(vec2i P, world *World)
+{
+    return (P.X >= 0 && P.X < World->Width && P.Y >= 0 && P.Y < World->Height);
+}
+
+inline b32
+IsPInitialized(vec2i P, world *World)
+{
+    return  World->TilesInitialized[XYToIdx(P, World->Width)];
+}
+
+inline void
+InitializeP(vec2i P, world *World)
+{
+    World->TilesInitialized[XYToIdx(P, World->Width)] = 1;
+}
+
+inline b32
 IsPValid(vec2i P, world *World)
 {
-    return (P.X >= 0 && P.X < World->Width && P.Y >= 0 && P.Y < World->Height &&
-            World->TilesInitialized[XYToIdx(P, World->Width)]);
+    return (IsPInBounds(P, World) && IsPInitialized(P, World));
 }
 
 inline int
@@ -390,6 +410,24 @@ inline b32
 IsInFOV(world *World, u8 *FieldOfVision, vec2i Pos)
 {
     return FieldOfVision[XYToIdx(Pos, World->Width)];
+}
+
+inline item *
+IsItemTypeInEntityInventory(item_type ItemType, entity *Entity)
+{
+    if (Entity->Inventory)
+    {
+        item *EntityItemSlot = Entity->Inventory;
+        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, EntityItemSlot++)
+        {
+            if (EntityItemSlot->ItemType == ItemType)
+            {
+                return EntityItemSlot;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 #define LogEntityAction(Entity, World, Format, ...) do { if (IsInFOV(World, World->PlayerEntity->FieldOfView, Entity->Pos)) { TraceLog(Format, __VA_ARGS__); } } while (0)
