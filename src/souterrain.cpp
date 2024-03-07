@@ -339,25 +339,21 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
                 {
                     entity *Entity = GameState->World.SpatialEntities[WorldI];
 
-                    entity *TopCharacter = Entity;
-                    while (TopCharacter)
+                    entity *EntityCursor = Entity;
+                    while (EntityCursor)
                     {
-                        if (TopCharacter->Type == ENTITY_NPC || TopCharacter->Type == ENTITY_PLAYER)
+                        if (EntityCursor->Type == ENTITY_NPC || EntityCursor->Type == ENTITY_PLAYER)
                         {
+                            Entity  = EntityCursor;
                             break;
                         }
-                        TopCharacter = TopCharacter->Next;
-                    }
-                    entity *TopItemPickup = Entity;
-                    while (TopItemPickup)
-                    {
-                        if (TopItemPickup->Type == ENTITY_ITEM_PICKUP)
+                        else if (Entity->Type != ENTITY_ITEM_PICKUP && EntityCursor->Type == ENTITY_ITEM_PICKUP)
                         {
-                            break;
+                            Entity = EntityCursor;
                         }
-                        TopItemPickup = TopItemPickup->Next;
+
+                        EntityCursor = EntityCursor->Next;
                     }
-                    Entity = (TopCharacter ? TopCharacter : (TopItemPickup ? TopItemPickup : Entity));
                     
                     if (Entity)
                     {
@@ -886,15 +882,17 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
             if (MouseReleased(SDL_BUTTON_RIGHT))
             {
-                // if (IsInFOV(World, Player->FieldOfView, MouseTileP))
-                entity *EntityToInspect = GetEntitiesAt(MouseTileP, World);
-                if (EntityToInspect)
+                if (IsInFOV(World, Player->FieldOfView, MouseTileP))
                 {
-                    SetEntityToInspect(&GameState->InspectState, EntityToInspect);
-                }
-                else
-                {
-                    ResetInspectMenu(&GameState->InspectState);
+                    entity *EntityToInspect = GetEntitiesAt(MouseTileP, World);
+                    if (EntityToInspect)
+                    {
+                        SetEntityToInspect(&GameState->InspectState, EntityToInspect);
+                    }
+                    else
+                    {
+                        ResetInspectMenu(&GameState->InspectState);
+                    }
                 }
             }
 
@@ -906,6 +904,10 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_PROCESSING_ENTITIES:
         {
+            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
+            if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
+            if (KeyPressed(SDL_SCANCODE_ESCAPE)) *Quit = true;
+
             entity *StartingEntity = EntityTurnQueuePeek(World);
             entity *ActiveEntity = StartingEntity;
             while (ActiveEntity != World->PlayerEntity)
@@ -1022,7 +1024,10 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_RANGED_ATTACK:
         {
-            if (KeyPressed(SDL_SCANCODE_ESCAPE))
+            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
+            if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
+            
+            if (KeyPressed(SDL_SCANCODE_ESCAPE) || KeyPressed(SDL_SCANCODE_F))
             {
                 GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
             }
@@ -1039,6 +1044,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                         GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
                     }
                 }
+
             }
         } break;
 
@@ -1149,7 +1155,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         {
             DrawRect(Rect(0, 780, 500, 1080), ColorAlpha(VA_BLACK, 240));
 
-            color PortraitColor = (((f32) Player->Health / (f32) Player->MaxHealth > 0.3f) ? VA_WHITE : VA_CRIMSON);
+            color PortraitColor = (((f32) Player->Health / (f32) Player->MaxHealth > 0.3f) ? VA_WHITE : Color(0xAE4642FF));
 
             DrawTexture(GameState->PlayerPortraitTex, Rect(10, 860, 160, 160), PortraitColor);
             vec2 PlayerPxP = Vec2(Player->Pos.X * World->TilePxW + World->TilePxW * 0.5f,
@@ -1454,9 +1460,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         if (GameState->InspectState.T != INSPECT_NONE && !GameState->InspectState.JustOpened && !InspectMenuInternalButtonPressed)
         {
-            vec2 MouseLogicalP = GetMouseLogicalPos();
-            b32 MouseInRect = CheckPointInRect(MouseLogicalP, InspectRect);
-
             if ((MouseReleased(SDL_BUTTON_LEFT) || MouseReleased(SDL_BUTTON_RIGHT)))
             {
                 ResetInspectMenu(&GameState->InspectState);

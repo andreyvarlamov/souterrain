@@ -567,7 +567,7 @@ GenerateWorld(game_state *GameState)
 #else
     int EnemyCount = 0;
     int AttemptCount = 0;
-    int EnemiesToAdd = 1;
+    int EnemiesToAdd = 15;
     int MaxAttempts = 500;
     while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
     {
