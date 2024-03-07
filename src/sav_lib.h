@@ -141,6 +141,7 @@ SAV_API b32 GetMouseRelativeMode();
 SAV_API void SetMouseRelativeMode(b32 Enabled);
 SAV_API vec2 GetMousePos();
 SAV_API vec2 GetMouseRelPos();
+SAV_API vec2 GetMouseLogicalPos();
 SAV_API b32 MouseDown(int Button);
 SAV_API b32 MousePressed(int Button);
 SAV_API b32 MouseReleased(int Button);
@@ -265,6 +266,14 @@ inline rect
 GetTextureRect(int X, int Y, sav_texture Texture)
 {
     return Rect(X, Y, Texture.Width, Texture.Height);
+}
+
+inline b32
+CheckPointInRect(vec2 P, rect R)
+{
+    vec2 MinR = RectGetMin(R);
+    vec2 MaxR = RectGetMax(R);
+    return (P.X > MinR.X && P.Y > MinR.Y && P.X < MaxR.X && P.Y < MaxR.Y);
 }
 
 #endif

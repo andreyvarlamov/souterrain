@@ -1896,14 +1896,6 @@ DrawString(const char *String,
 }
 
 // SECTION: GUI
-b32
-CheckPointInRect(vec2 P, rect R)
-{
-    vec2 MinR = RectGetMin(R);
-    vec2 MaxR = RectGetMax(R);
-    return (P.X > MinR.X && P.Y > MinR.Y && P.X < MaxR.X && P.Y < MaxR.Y);
-}
-
 int
 GuiButtonRect(rect R)
 {

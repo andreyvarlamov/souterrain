@@ -212,6 +212,38 @@ struct glyph_atlas
     int GlyphPxHPad;
 };
 
+enum inspect_type
+{
+    INSPECT_NONE = 0,
+    INSPECT_ENTITY,
+    INSPECT_ITEM_TO_PICKUP,
+    INSPECT_ITEM_TO_DROP
+};
+
+struct inspect_state_entity
+{
+    entity *EntityToInspect;
+};
+
+struct inspect_state_item
+{
+    item *ItemToInspect;
+    entity *ItemPickup;
+};
+
+struct inspect_state
+{
+    inspect_type T;
+
+    b32 JustOpened;
+
+    union
+    {
+        inspect_state_entity IS_Entity;
+        inspect_state_item IS_Item;
+    };
+};
+
 struct game_state
 {
     b32 IsInitialized;
@@ -253,6 +285,8 @@ struct game_state
     item *PlayerRequestedDropItem;
     item *PlayerRequestedPickupItem;
     entity *PlayerRequestedPickupItemItemPickup;
+
+    inspect_state InspectState;
 };
 
 static_g vec2i DIRECTIONS[] = {
