@@ -584,7 +584,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         // GameState->BodyFont = SavLoadFont(&GameState->ResourceArena, "res/ProtestStrike-Regular.ttf", 28);
 
         // NOTE: Textures
-        GameState->GlyphAtlas.T = SavLoadTexture("res/NewFontWhite.png");
+        GameState->GlyphAtlas.T = SavLoadTexture("res/NewFontWhite2.png");
         GameState->GlyphAtlas.GlyphsPerRow = 16;
         GameState->GlyphAtlas.GlyphPadX = 1;
         GameState->GlyphAtlas.GlyphPadY = 1;
@@ -592,7 +592,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->GlyphAtlas.GlyphPxH = 54;
         GameState->GlyphAtlas.GlyphPxWPad = GameState->GlyphAtlas.GlyphPxW + 2 * GameState->GlyphAtlas.GlyphPadX;
         GameState->GlyphAtlas.GlyphPxHPad = GameState->GlyphAtlas.GlyphPxH + 2 * GameState->GlyphAtlas.GlyphPadY;
-        GameState->GlyphAtlasNormalTex = SavLoadTexture("res/NewFontNormals4.png");
+        GameState->GlyphAtlasNormalTex = SavLoadTexture("res/NewFontNormals5.png");
         GameState->VigTex = GenerateVignette(&GameState->TrArenaA);
         GameState->GroundBrushTex = SavLoadTexture("res/GroundBrushes5.png");
         GameState->GroundBrushRect = Rect(GameState->GroundBrushTex.Width, GameState->GroundBrushTex.Width);
@@ -619,7 +619,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->Camera.Rotation = 0.0f;
         CameraInitLogZoomSteps(&GameState->Camera, 0.2f, 5.0f, 5);
         GameState->Camera.Offset = GetWindowSize() / 2.0f;
-        UpdateCameraToWorldTarget(&GameState->Camera, &GameState->World, GameState->World.PlayerEntity->Pos);
+        GameState->Camera.Target = GetPxPFromTileP(&GameState->World, GameState->World.PlayerEntity->Pos);
 
         // NOTE: Ground drawing state
         int GroundPointsWidth = 32;
@@ -852,9 +852,17 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     }
                     
                     // NOTE: Move entity can set TurnUsed to false, if that was a non-attack collision
-                    if (FoundPosition && MoveEntity(World, World->PlayerEntity, NewP, &TurnUsed))
+                    vec2i OldP = Player->Pos;
+                    if (FoundPosition && MoveEntity(World, Player, NewP, &TurnUsed))
                     {
-                        UpdateCameraToWorldTarget(&GameState->Camera, World, NewP);
+                        if (IsPositionInCameraView(OldP, &GameState->Camera, World))
+                        {
+                            GameState->Camera.Target += GetPxPFromTileP(World, Player->Pos) - GetPxPFromTileP(World, OldP);
+                        }
+                        else
+                        {
+                            GameState->Camera.Target = GetPxPFromTileP(World, Player->Pos);
+                        }
                     }
                 }
             }
@@ -1088,6 +1096,11 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 if (Entity->ActionCost > 0)
                 {
                     EntityTurnQueueDelete(World, Entity);
+                }
+                if (Entity->Type == ENTITY_PLAYER)
+                {
+                    GameState->IgnoreFieldOfView = true;
+                    PlayerFovDirty = true;
                 }
                 DeleteEntity(World, Entity);
             }

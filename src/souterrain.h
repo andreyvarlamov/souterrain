@@ -122,6 +122,20 @@ struct entity_queue_node
 };
 
 enum { DARKNESS_UNSEEN = 255, DARKNESS_SEEN = 180, DARKNESS_IN_VIEW = 0 };
+ 
+enum room_type
+{
+    ROOM_NONE,
+    ROOM_ENTRANCE,
+    ROOM_SACRIFICIAL,
+    ROOM_WASTE,
+    ROOM_TEMPLE,
+    ROOM_XLARGE,
+    ROOM_LARGE,
+    ROOM_MEDIUM,
+    ROOM_SMALL,
+    ROOM_EXIT
+};
 
 struct room
 {
@@ -129,8 +143,10 @@ struct room
     int Y;
     int W;
     int H;
-};
 
+    room_type Type;
+};
+ 
 enum tile_type
 {
     TILE_NONE = 0,
@@ -319,14 +335,6 @@ inline void ClearFlags(u32 *Flags, u32 Mask) { *Flags &= ~Mask; }
 inline b32 EntityExists(entity *Entity) { return Entity->Type > 0; }
 inline b32 EntityIsDead(entity *Entity) { return Entity->Health <= 0; }
 
-inline void
-UpdateCameraToWorldTarget(camera_2d *Camera, world *World, vec2i WorldP)
-{
-    f32 TargetPxX = (f32) WorldP.X * World->TilePxW + World->TilePxW / 2.0f;
-    f32 TargetPxY = (f32) WorldP.Y * World->TilePxH + World->TilePxH / 2.0f;
-    Camera->Target = Vec2(TargetPxX, TargetPxY);
-}
-
 inline rect
 GetWorldDestRect(world World, vec2i P)
 {
@@ -360,6 +368,15 @@ GetTilePFromPxP(world *World, vec2 PxP)
     return TileP;
 }
 
+inline vec2
+GetPxPFromTileP(world *World, vec2i TileP)
+{
+    vec2 PxP;
+    PxP.X = (f32) TileP.X * World->TilePxW + World->TilePxW / 2.0f;
+    PxP.Y = (f32) TileP.Y * World->TilePxH + World->TilePxH / 2.0f;
+    return PxP;
+}
+ 
 inline rect
 GetWorldCameraRect(camera_2d *Camera)
 {
@@ -368,7 +385,15 @@ GetWorldCameraRect(camera_2d *Camera)
                                         
     return RectMinMax(WorldMin, WorldMax);
 }
-    
+
+inline b32
+IsPositionInCameraView(vec2i P, camera_2d *Camera, world *World)
+{
+    rect CameraRect = GetWorldCameraRect(Camera);
+    vec2 PxP = GetPxPFromTileP(World, P);
+    return IsPInRect(PxP, CameraRect);
+}
+
 inline b32
 IsPInBounds(vec2i P, world *World)
 {

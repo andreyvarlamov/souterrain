@@ -287,8 +287,16 @@ ValidateEntitySpatialPartition(world *World)
 }
 
 // SECTION: WORLD GEN
-vec2i
-GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
+enum gen_tile_type
+{
+    GEN_TILE_NONE = 0,
+    GEN_TILE_GROUND,
+    GEN_TILE_WALL,
+    GEN_TILE_STATUE
+};
+
+void
+GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsMax, int *RoomCount)
 {
     int TileCount = World->Width * World->Height;
 
@@ -297,15 +305,12 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
         World->Tiles[i] = TILE_WATER;
     }
 
-    int RoomsMax = 50;
     int SizeMin = 6;
     int SizeMax = 20;
 
-    MemoryArena_Freeze(TrArena);
+    *RoomCount = 0;
 
-    room *Rooms = MemoryArena_PushArray(TrArena, RoomsMax, room);
-    int RoomCount = 0;
-
+    // NOTE: Generate room data and room floors
     for (int RoomI = 0; RoomI < RoomsMax; RoomI++)
     {
         room Room;
@@ -314,12 +319,30 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
         Room.X = GetRandomValue(2, World->Width - Room.W - 2);
         Room.Y = GetRandomValue(2, World->Height - Room.H - 2);
 
+        int RoomArea = Room.W * Room.H;
+        if (RoomArea < 65)
+        {
+            Room.Type = ROOM_SMALL;
+        }
+        else if (RoomArea < 100)
+        {
+            Room.Type = ROOM_MEDIUM;
+        }
+        else if (RoomArea < 256)
+        {
+            Room.Type = ROOM_LARGE;
+        }
+        else
+        {
+            Room.Type = ROOM_XLARGE;
+        }
+
         b32 Intersects = false;
         for (int Y = Room.Y - 2; Y < (Room.Y + Room.H + 2); Y++)
         {
             for (int X = Room.X - 2; X < (Room.X + Room.W + 2); X++)
             {
-                if (GeneratedMap[XYToIdx(X, Y, World->Width)] > 0)
+                if (GeneratedMap[XYToIdx(X, Y, World->Width)] != GEN_TILE_NONE)
                 {
                     Intersects = true;
                     break;
@@ -335,22 +358,47 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
                 for (int X = Room.X; X < (Room.X + Room.W); X++)
                 {
                     int Idx = XYToIdx(X, Y, World->Width);
-                    GeneratedMap[Idx] = 1;
+                    GeneratedMap[Idx] = GEN_TILE_GROUND;
                     World->Tiles[Idx] = (u8) (GrassRoom ? TILE_GRASS : TILE_STONE);
                     World->TilesInitialized[Idx] = true;
                 }
             }
 
-            Rooms[RoomCount++] = Room;
+            GeneratedRooms[(*RoomCount)++] = Room;
         }
     }
 
-    MemoryArena_ResizePreviousPushArray(TrArena, RoomCount, room);
-
-    for (int RoomI = 0; RoomI < RoomCount - 1; RoomI++)
+    // NOTE: Post process rooms to determine types
     {
-        room *Room1 = Rooms + RoomI;
-        room *Room2 = Rooms + RoomI + 1;
+        room *Room = GeneratedRooms;
+        for (int RoomI = 0; RoomI < *RoomCount; RoomI++, Room++)
+        {
+            if (RoomI == 0)
+            {
+                Room->Type = ROOM_ENTRANCE;
+            }
+            else if (RoomI == (*RoomCount) - 1)
+            {
+                Room->Type = ROOM_EXIT;
+            }
+            else if (Room->Type == ROOM_LARGE)
+            {
+                if (GetRandomValue(0, 2) == 0)
+                {
+                    Room->Type = ROOM_TEMPLE;
+                }
+            }
+        }
+    }
+
+    GeneratedRooms[0].Type = ROOM_ENTRANCE;
+    GeneratedRooms[(*RoomCount) - 1].Type = ROOM_EXIT;
+
+    // NOTE: Connect rooms with corridors
+    for (int RoomI = 0; RoomI < *RoomCount - 1; RoomI++)
+    {
+        room *Room1 = GeneratedRooms + RoomI;
+        room *Room2 = GeneratedRooms + RoomI + 1;
         
         vec2i Room1Center = Vec2I(Room1->X + Room1->W / 2, Room1->Y + Room1->H / 2);
         vec2i Room2Center = Vec2I(Room2->X + Room2->W / 2, Room2->Y + Room2->H / 2);
@@ -358,14 +406,29 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
         vec2i LeftCenter = Room1Center.X < Room2Center.X ? Room1Center : Room2Center;
         vec2i RightCenter = Room1Center.X >= Room2Center.X ? Room1Center : Room2Center;
 
+        int CorridorVersion = GetRandomValue(0, 2);
+
+        int ConstY;
+        int ConstX;
+        if (CorridorVersion)
+        {
+            ConstX = RightCenter.X;
+            ConstY = LeftCenter.Y;
+        }
+        else
+        {
+            ConstX = LeftCenter.X;
+            ConstY = RightCenter.Y;
+        }
+
         if (LeftCenter.Y < RightCenter.Y)
         {
             for (int X = LeftCenter.X; X <= RightCenter.X; X++)
             {
-                int Idx = XYToIdx(X, LeftCenter.Y, World->Width);
+                int Idx = XYToIdx(X, ConstY, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = 1;
+                    GeneratedMap[Idx] = GEN_TILE_GROUND;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -373,10 +436,10 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
 
             for (int Y = LeftCenter.Y; Y <= RightCenter.Y; Y++)
             {
-                int Idx = XYToIdx(RightCenter.X, Y, World->Width);
+                int Idx = XYToIdx(ConstX, Y, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = 1;
+                    GeneratedMap[Idx] = GEN_TILE_GROUND;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -386,10 +449,10 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
         {
             for (int X = LeftCenter.X; X <= RightCenter.X; X++)
             {
-                int Idx = XYToIdx(X, RightCenter.Y, World->Width);
+                int Idx = XYToIdx(X, ConstY, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = 1;
+                    GeneratedMap[Idx] = GEN_TILE_GROUND;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -397,10 +460,10 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
 
             for (int Y = RightCenter.Y; Y <= LeftCenter.Y; Y++)
             {
-                int Idx = XYToIdx(LeftCenter.X, Y, World->Width);
+                int Idx = XYToIdx(ConstX, Y, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = 1;
+                    GeneratedMap[Idx] = GEN_TILE_GROUND;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -408,6 +471,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
         }
     }
 
+    // NOTE: Create walls around all ground tiles
     for (int TileI = 0; TileI < TileCount; TileI++)
     {
         if (GeneratedMap[TileI] == 0)
@@ -418,7 +482,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
             {
                 vec2i Neighbor = Current + DIRECTIONS[Dir];
 
-                if (GeneratedMap[XYToIdx(Neighbor, World->Width)] == 1)
+                if (IsPInBounds(Neighbor, World) && GeneratedMap[XYToIdx(Neighbor, World->Width)] == 1)
                 {
                     FoundRoomGround = true;
                     break;
@@ -427,18 +491,42 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, memory_arena *TrArena)
 
             if (FoundRoomGround)
             {
-                GeneratedMap[TileI] = 2;
+                GeneratedMap[TileI] = GEN_TILE_WALL;
                 World->Tiles[TileI] = TILE_STONE;
                 World->TilesInitialized[TileI] = true;
             }
         }
     }
 
-    vec2i Room0Center = Vec2I(Rooms[0].X + Rooms[0].W / 2, Rooms[0].Y + Rooms[0].H / 2);
- 
-    MemoryArena_Unfreeze(TrArena);
+    // NOTE: Generate other structures based on room types
+    {
+        room *Room = GeneratedRooms;
+        for (int i = 0; i < *RoomCount; i++, Room++)
+        {
+            switch (Room->Type)
+            {
+                case ROOM_ENTRANCE:
+                {
+                    // TODO: Stairs in the middle
+                    // TODO: Novice item drop close to the middle
+                    // TODO: A low level enemy close to the middle
+                } break;
 
-    return Room0Center;
+                case ROOM_TEMPLE:
+                {
+                    
+                } break;
+
+                case ROOM_EXIT:
+                {
+                    // TODO: Stairs in the middle
+                    // TODO: Level boss
+                } break;;
+
+                default: break;
+            }
+        }
+    }
 }
 
 #define GENERATED_MAP 1
@@ -475,7 +563,13 @@ GenerateWorld(game_state *GameState)
 #if (GENERATED_MAP == 1)
     
     u8 *GeneratedEntityMap = MemoryArena_PushArrayAndZero(&GameState->TrArenaA, World->Width * World->Height, u8);
-    vec2i Room0Center = GenerateRoomMap(World, GeneratedEntityMap, &GameState->TrArenaA);
+    int RoomsMax = 50;
+    int RoomCount;
+    room *GeneratedRooms = MemoryArena_PushArrayAndZero(&GameState->TrArenaA, RoomsMax, room);
+    GenerateRoomMap(World, GeneratedEntityMap, GeneratedRooms, RoomsMax, &RoomCount);
+    MemoryArena_ResizePreviousPushArray(&GameState->TrArenaA, RoomCount, room);
+
+    vec2i PlayerP = Vec2I(GeneratedRooms[0].X + GeneratedRooms[0].W / 2, GeneratedRooms[0].Y + GeneratedRooms[0].H / 2);
 
     // entity W = GetTestEntityBlueprint(ENTITY_STATIC, '#', VA_WHITE);
     // entity G = GetTestEntityBlueprint(ENTITY_STATIC, '@', VA_BLACK);
@@ -502,7 +596,7 @@ GenerateWorld(game_state *GameState)
 
 #else
 
-    vec2i Room0Center = Vec2I(5, 5);
+    vec2i PlayerP = Vec2I(5, 5);
 
     for (int i = 0; i < World->Width * World->Height; i++)
     {
@@ -525,7 +619,7 @@ GenerateWorld(game_state *GameState)
 #endif
 
     entity Player = Template_Player();
-    World->PlayerEntity = AddEntity(World, Room0Center, &Player, &GameState->WorldArena);
+    World->PlayerEntity = AddEntity(World, PlayerP, &Player, &GameState->WorldArena);
 
     entity ItemPickupTestTemplate = {};
     ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
@@ -565,7 +659,7 @@ GenerateWorld(game_state *GameState)
         }
         AttemptCount++;
     }
-#else
+#elif 0
     int EnemyCount = 0;
     int AttemptCount = 0;
     int EnemiesToAdd = 3;
@@ -583,9 +677,46 @@ GenerateWorld(game_state *GameState)
         }
         AttemptCount++;
     }
+#else
+    int EnemyCount = 0;
+    {
+        room *Room = GeneratedRooms;
+        int MaxAttempts = 100;
+        for (int i = 0; i < RoomCount; i++, Room++)
+        {
+            if (Room->Type == ROOM_LARGE)
+            {
+                if (GetRandomValue(0, 2) == 0)
+                {
+                    // NOTE: Aether Fly room
+                    int Attempt = 0;
+                    int AetherFlyCount = 0;
+                    int AetherFlyMaxCount = GetRandomValue(20, 50);
+                    while (AetherFlyCount < AetherFlyMaxCount && Attempt < MaxAttempts)
+                    {
+                        int X = GetRandomValue(Room->X, Room->X + Room->W);
+                        int Y = GetRandomValue(Room->Y, Room->Y + Room->H);
+                        vec2i P = Vec2I(X, Y);
+                        if (!CheckCollisions(World, P).Collided)
+                        {
+                            AddEntity(World, P, &AetherFly, &GameState->WorldArena);
+                            EnemyCount++;
+                        }
+                        Attempt++;
+                    }
+                }
+            }
+        }
+    }
 #endif
 
-    TraceLog("Generated world. Added %d enemies in %d attempts.", EnemyCount, AttemptCount);
+#ifdef SAV_DEBUG
+    // NOTE: Signed overflow so we know which entities got added post world gen :)
+    World->EntityCurrentDebugID = INT_MAX;
+    World->EntityCurrentDebugID++;
+
+    TraceLog("Generated world. Added %d enemies.", EnemyCount);
+#endif
 }
 
 // SECTION: PATHFINDING
@@ -845,7 +976,7 @@ TraceLineBresenham(world *World, vec2i A, vec2i B, u8 *VisibilityMap, int MaxRan
 
     if (DeltaX >= DeltaY)
     {
-        int Error = (DeltaY - (DeltaY >> 1));
+        int Error = (DeltaY - (DeltaX >> 1));
 
         while (X1 != X2)
         {
@@ -962,7 +1093,7 @@ IsInLineOfSight(world *World, vec2i Start, vec2i End, int MaxRange)
 
         if (DeltaX >= DeltaY)
         {
-            int Error = (DeltaY - (DeltaY >> 1));
+            int Error = (DeltaY - (DeltaX >> 1));
             while (CurrentX != EndX)
             {
                 if ((Error > 0) || (!Error && (IX > 0)))
@@ -1023,7 +1154,7 @@ IsInRangedAttackRange(world *World, vec2i Start, vec2i End, int MaxRange)
 
         if (DeltaX >= DeltaY)
         {
-            int Error = (DeltaY - (DeltaY >> 1));
+            int Error = (DeltaY - (DeltaX >> 1));
             while (CurrentX != EndX)
             {
                 if ((Error > 0) || (!Error && (IX > 0)))
@@ -1408,7 +1539,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
         case NPC_STATE_IDLE:
         {
             int ShouldMove = GetRandomValue(0, 12);
-            if (ShouldMove >= 6)
+            if (ShouldMove >= 10)
             {
                 int RandDir = GetRandomValue(0, 4);
                 vec2i NewEntityP = Entity->Pos;

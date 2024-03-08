@@ -1908,7 +1908,7 @@ GuiButtonRect(rect R)
 {
     vec2 MouseP = GetMouseLogicalPos();
 
-    b32 MouseInRect = CheckPointInRect(MouseP, R);
+    b32 MouseInRect = IsPInRect(MouseP, R);
     if (MouseInRect)
     {
         color C = ColorAlpha(VA_BLACK, 128);

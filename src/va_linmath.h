@@ -140,6 +140,7 @@ inline rect RectMinMax(vec2 Min, vec2 Max) { return { Min.X, Min.Y, Max.X - Min.
 inline vec2 RectGetMin(rect Rect) { return { Rect.X, Rect.Y }; }
 inline vec2 RectGetMax(rect Rect) { return { Rect.X + Rect.Width, Rect.Y + Rect.Height }; }
 inline vec2 RectGetMid(rect Rect) { return { Rect.X + Rect.Width / 2.0f, Rect.Y + Rect.Height / 2.0f }; }
+inline b32 IsPInRect(vec2 P, rect Rect) { return (P.X >Rect.X && P.X < Rect.X+Rect.Width && P.Y > Rect.Y && P.Y < Rect.Y+Rect.Height); }
 
 inline void
 RectGetPoints(rect Rect, vec2 *Points)
