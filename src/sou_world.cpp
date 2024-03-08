@@ -286,15 +286,16 @@ ValidateEntitySpatialPartition(world *World)
     return true;
 }
 
-// SECTION: WORLD GEN
-enum gen_tile_type
+vec2i
+GetRandomRoomP(room *Room)
 {
-    GEN_TILE_NONE = 0,
-    GEN_TILE_GROUND,
-    GEN_TILE_WALL,
-    GEN_TILE_STATUE
-};
+    int X = GetRandomValue(Room->X, Room->X+Room->W);
+    int Y = GetRandomValue(Room->Y, Room->Y+Room->H);
 
+    return Vec2I(X, Y);
+}
+
+// SECTION: WORLD GEN
 void
 GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsMax, int *RoomCount)
 {
@@ -358,7 +359,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
                 for (int X = Room.X; X < (Room.X + Room.W); X++)
                 {
                     int Idx = XYToIdx(X, Y, World->Width);
-                    GeneratedMap[Idx] = GEN_TILE_GROUND;
+                    GeneratedMap[Idx] = GEN_TILE_FLOOR;
                     World->Tiles[Idx] = (u8) (GrassRoom ? TILE_GRASS : TILE_STONE);
                     World->TilesInitialized[Idx] = true;
                 }
@@ -428,7 +429,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
                 int Idx = XYToIdx(X, ConstY, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = GEN_TILE_GROUND;
+                    GeneratedMap[Idx] = GEN_TILE_CORRIDOR;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -439,7 +440,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
                 int Idx = XYToIdx(ConstX, Y, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = GEN_TILE_GROUND;
+                    GeneratedMap[Idx] = GEN_TILE_CORRIDOR;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -452,7 +453,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
                 int Idx = XYToIdx(X, ConstY, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = GEN_TILE_GROUND;
+                    GeneratedMap[Idx] = GEN_TILE_CORRIDOR;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -463,7 +464,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
                 int Idx = XYToIdx(ConstX, Y, World->Width);
                 if (GeneratedMap[Idx] == 0)
                 {
-                    GeneratedMap[Idx] = GEN_TILE_GROUND;
+                    GeneratedMap[Idx] = GEN_TILE_CORRIDOR;
                     World->Tiles[Idx] = TILE_STONE;
                     World->TilesInitialized[Idx] = true;
                 }
@@ -482,7 +483,10 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
             {
                 vec2i Neighbor = Current + DIRECTIONS[Dir];
 
-                if (IsPInBounds(Neighbor, World) && GeneratedMap[XYToIdx(Neighbor, World->Width)] == 1)
+                u8 GenTileType = GeneratedMap[XYToIdx(Neighbor, World->Width)];
+                if (IsPInBounds(Neighbor, World) &&
+                    GenTileType == GEN_TILE_FLOOR ||
+                    GenTileType == GEN_TILE_CORRIDOR)
                 {
                     FoundRoomGround = true;
                     break;
@@ -514,7 +518,20 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
 
                 case ROOM_TEMPLE:
                 {
-                    
+                    int StatuesMax = 3;
+                    int AttemptsMax = 10;
+                    int Statues;
+                    int Attempts;
+                    for (Statues = 0, Attempts = 0; Statues < StatuesMax && Attempts < AttemptsMax; Attempts++)
+                    {
+                        vec2i P = GetRandomRoomP(Room);
+                        u8 *GenTileType = GeneratedMap + XYToIdx(P, World->Width);
+                        if (*GenTileType == GEN_TILE_FLOOR)
+                        {
+                            *GenTileType = GEN_TILE_STATUE;
+                            Statues++;
+                        }
+                    }
                 } break;
 
                 case ROOM_EXIT:
@@ -559,6 +576,8 @@ GenerateWorld(game_state *GameState)
     World->EntityTurnQueue = MemoryArena_PushArray(&GameState->WorldArena, World->TurnQueueMax, entity_queue_node);
 
     entity PumiceWall = Template_PumiceWall();
+    entity LatenaStatue = Template_LatenaStatue();
+    entity XetelStatue = Template_XetelStatue();
 
 #if (GENERATED_MAP == 1)
     
@@ -586,11 +605,20 @@ GenerateWorld(game_state *GameState)
     // }
 
     // NOTE: Add walls
-    for (int i = 0; i < World->Width * World->Height; i++)
+    for (int WorldI = 0; WorldI < World->Width * World->Height; WorldI++)
     {
-        if (GeneratedEntityMap[i] == 2)
+        switch (GeneratedEntityMap[WorldI])
         {
-            AddEntity(&GameState->World, IdxToXY(i, World->Width), &PumiceWall, &GameState->WorldArena);
+            case GEN_TILE_WALL:
+            {
+                AddEntity(&GameState->World, IdxToXY(WorldI, World->Width), &PumiceWall, &GameState->WorldArena);
+            } break;
+
+            case GEN_TILE_STATUE:
+            {
+                entity *Statue = GetRandomValue(0, 2) ? &LatenaStatue : &XetelStatue;
+                AddEntity(&GameState->World, IdxToXY(WorldI, World->Width), Statue, &GameState->WorldArena);
+            } break;
         }
     }
 
@@ -1581,11 +1609,11 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                 b32 TurnUsed;
                 MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
             }
-            else
-            {
-                Entity->NpcState = NPC_STATE_IDLE;
-                TraceLog("%s (%d): cannot path to player (%d, %d). Now idle", Entity->Name, Entity->DebugID, World->PlayerEntity->Pos.X, World->PlayerEntity->Pos.Y);
-            }
+            // else
+            // {
+            //     Entity->NpcState = NPC_STATE_IDLE;
+            //     TraceLog("%s (%d): cannot path to player (%d, %d). Now idle", Entity->Name, Entity->DebugID, World->PlayerEntity->Pos.X, World->PlayerEntity->Pos.Y);
+            // }
         } break;
 
         case NPC_STATE_SEARCHING:

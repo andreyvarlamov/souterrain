@@ -18,6 +18,10 @@ Template_DUMMY()
 ;
 #endif
 
+//////////////////////////
+// SECTION: LEVEL GEOMETRY
+//////////////////////////
+
 TEMPLATE_FUNC entity
 Template_PumiceWall()
 #ifdef TEMPLATE_EXPORTS
@@ -26,7 +30,7 @@ Template_PumiceWall()
     
     Template.Type = ENTITY_WALL;
     Template.Color = VA_SLATEGRAY;
-    Template.Glyph = 11 + 16*13;
+    Template.Glyph = 11 + 13*16;
     Template.Name = "Pumice Wall";
     Template.Description = "Wall made of soft pumice rock.";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING | ENTITY_IS_OPAQUE);
@@ -36,6 +40,48 @@ Template_PumiceWall()
 #else
 ;
 #endif
+
+TEMPLATE_FUNC entity
+Template_LatenaStatue() 
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    
+    Template.Type = ENTITY_STATUE;
+    Template.Color = VA_GRAY;
+    Template.Glyph = 9 + 14*16;
+    Template.Name = "Statue to Latena";
+    Template.Description = "The ox-eyed goddess of pride and imagery. According to the legends, the great god Xetel was so enamaoured by Latena, that he built Souterrain for her.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_XetelStatue()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    
+    Template.Type = ENTITY_STATUE;
+    Template.Color = VA_GRAY;
+    Template.Glyph = 8 + 14*16;
+    Template.Name = "Statue to Xetel";
+    Template.Description = "The great god of glory and ambition. He was a de facto ruler of the worlds, until his wife Latena decimated his mind and consumed his body.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    return Template;
+}
+#else
+;
+#endif
+
+//////////////////////////
+// SECTION: NPCS /////////
+//////////////////////////
 
 TEMPLATE_FUNC entity
 Template_Player()
@@ -104,6 +150,10 @@ Template_AetherFly()
 #else
 ;
 #endif
+
+//////////////////////////
+// SECTION: ITEMS ////////
+//////////////////////////
 
 TEMPLATE_FUNC item
 Template_Sword()

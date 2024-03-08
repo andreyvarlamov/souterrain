@@ -26,6 +26,7 @@ enum entity_type
     ENTITY_NPC,
     ENTITY_PLAYER,
     ENTITY_ITEM_PICKUP,
+    ENTITY_STATUE,
     ENTITY_TYPE_COUNT
 };
 
@@ -135,6 +136,15 @@ enum room_type
     ROOM_MEDIUM,
     ROOM_SMALL,
     ROOM_EXIT
+};
+
+enum gen_tile_type
+{
+    GEN_TILE_NONE = 0,
+    GEN_TILE_FLOOR,
+    GEN_TILE_WALL,
+    GEN_TILE_CORRIDOR,
+    GEN_TILE_STATUE
 };
 
 struct room
