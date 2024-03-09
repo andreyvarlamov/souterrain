@@ -172,7 +172,7 @@ enum tile_type
     TILE_COUNT
 };
 
-enum { OPEN_SET_MAX = 1024, PATH_MAX = 512 };
+enum { OPEN_SET_MAX = 1024, PATHFIND_MAX_ITERATIONS = 1024, PATH_MAX = 512 };
 
 struct path_state
 {
@@ -240,6 +240,8 @@ struct world
     entity *PlayerEntity;
 
     i64 TurnsPassed;
+
+    vec2i Exit;
 };
 
 struct collision_info

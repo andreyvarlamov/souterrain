@@ -721,15 +721,17 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
             case GEN_TILE_STAIR_DOWN:
             {
                 AddEntity(World, IdxToXY(WorldI, World->Width), &StairsDown);
+                World->Exit = IdxToXY(WorldI, World->Width);
             } break;
 
             default: break;
         }
     }
 
+
 #else
 
-    vec2i PlayerP = Vec2I(5, 5);
+    vec2i PlayerP = Vec2I(10, 10);
 
     for (int i = 0; i < World->Width * World->Height; i++)
     {
@@ -796,7 +798,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
 #elif 0
     int EnemyCount = 0;
     int AttemptCount = 0;
-    int EnemiesToAdd = 3;
+    int EnemiesToAdd = 0;
     int MaxAttempts = 500;
     while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
     {
@@ -976,6 +978,7 @@ AddToOpenSet(path_state *PathState, int Idx)
     if (!IsInOpenSet(PathState, Idx))
     {
         PathState->OpenSet[PathState->OpenSetCount++] = Idx;
+        
         // if (PathState->OpenSetCount > OpenSetMax)
         // {
         //     OpenSetMax = PathState->OpenSetCount;
@@ -1003,8 +1006,10 @@ GetNeighbors(vec2i Pos, world *World,
     }
 }
 
+#undef VIZ
+
 path_result
-CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memory_arena *ResultArena, int VizGenMax, b32 IgnoreNPCs = false)
+CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memory_arena *ResultArena, int MaxIterations = 0xFFFFFFFF, b32 IgnoreNPCs = false, int VizGenMax = 0)
 {
     // CalculatePathCalls++;
     
@@ -1053,6 +1058,7 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
 
     b32 FoundPath = false;
     int CurrentIdx;
+    int IterationCount = 0;
     while (PopLowestScoreFromOpenSet(&PathState, &CurrentIdx))
     {
         if (CurrentIdx == EndIdx)
@@ -1109,6 +1115,8 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
         }
         VizGen++;
 #endif
+
+        if (IterationCount++ > MaxIterations) break;
     }
 
     Result.FoundPath = FoundPath;
@@ -1805,7 +1813,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             path_result Path = CalculatePath(World,
                                              Entity->Pos, World->PlayerEntity->Pos,
                                              &GameState->ScratchArenaA, &GameState->ScratchArenaB,
-                                             0);
+                                             512);
 
             // NOTE: TOO SLOW :(
             if (!Path.FoundPath)
@@ -1813,7 +1821,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                 Path = CalculatePath(World,
                                      Entity->Pos, Entity->Target,
                                      &GameState->ScratchArenaA, &GameState->ScratchArenaB,
-                                     0, true);
+                                     512, true);
             }
             
             if (Path.FoundPath && Path.Path)
@@ -1836,7 +1844,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             path_result Path = CalculatePath(World,
                                              Entity->Pos, Entity->Target,
                                              &GameState->ScratchArenaA, &GameState->ScratchArenaB,
-                                             0);
+                                             512);
 
             int MaxWillingToGo = 20;
             if (!Path.FoundPath || Path.PathSteps > MaxWillingToGo)
@@ -1844,7 +1852,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                 Path = CalculatePath(World,
                                      Entity->Pos, Entity->Target,
                                      &GameState->ScratchArenaA, &GameState->ScratchArenaB,
-                                     0, true);
+                                     512, true);
             }
 
             if (Path.FoundPath && Path.PathSteps > MaxWillingToGo)

@@ -1235,6 +1235,21 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
     Assert(ValidateEntitySpatialPartition(GameState->World));
 
+    // static_p int VizGen = 0;
+
+    // if (KeyPressedOrRepeat(SDL_SCANCODE_RIGHT))
+    // {
+    //     VizGen++;
+    // }
+    // else if (KeyPressedOrRepeat(SDL_SCANCODE_LEFT))
+    // {
+    //     VizGen--;
+    //     if (VizGen < 0)
+    //     {
+    //         VizGen = 0;
+    //     }
+    // }
+
     // SECTION: RENDER
     // NOTE: Draw debug overlay
     BeginTextureMode(GameState->DebugOverlay, Rect(0)); BeginCameraMode(&GameState->Camera); 
@@ -1256,6 +1271,17 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 }
             }
         }
+
+        // path_result Path = CalculatePath(World, Player->Pos, World->Exit, &GameState->ScratchArenaA, &GameState->ScratchArenaB, 512, false, VizGen);
+
+        // if (Path.FoundPath && Path.Path)
+        // {
+        //     vec2i *Step = Path.Path;
+        //     for (int i = 0; i < Path.PathSteps; i++, Step++)
+        //     {
+        //         DrawRect(World, *Step, ColorAlpha(VA_RED, 150));
+        //     }
+        // }
     }
     EndCameraMode(); EndTextureMode();
 
@@ -1268,7 +1294,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         
         // NOTE: Debug UI
         {
-            DrawString("60.000 FPS",//TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
+            DrawString(TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
                        GameState->TitleFont,
                        GameState->TitleFont->PointSize,
                        10, 10, 0,
