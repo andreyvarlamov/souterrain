@@ -27,6 +27,8 @@ enum entity_type
     ENTITY_PLAYER,
     ENTITY_ITEM_PICKUP,
     ENTITY_STATUE,
+    ENTITY_STAIR_DOWN,
+    ENTITY_STAIR_UP,
     ENTITY_TYPE_COUNT
 };
 
@@ -144,7 +146,9 @@ enum gen_tile_type
     GEN_TILE_FLOOR,
     GEN_TILE_WALL,
     GEN_TILE_CORRIDOR,
-    GEN_TILE_STATUE
+    GEN_TILE_STATUE,
+    GEN_TILE_STAIR_UP,
+    GEN_TILE_STAIR_DOWN,
 };
 
 struct room
@@ -186,8 +190,17 @@ struct path_result
     int PathSteps;
 };
 
+struct ground_splat
+{
+    vec2 Position;
+    f32 Rotation;
+    f32 Scale;
+};
+
 struct world
 {
+    memory_arena Arena;
+    
     int Width;
     int Height;
     int TilePxW;
@@ -209,9 +222,12 @@ struct world
     int TurnQueueCount;
     int TurnQueueMax;
 
-    i64 TurnsPassed;
-
+    int GroundSplatCount;
+    ground_splat *GroundSplats;
+    
     entity *PlayerEntity;
+
+    i64 TurnsPassed;
 };
 
 struct collision_info
@@ -223,6 +239,7 @@ struct collision_info
 enum run_state
 {
     RUN_STATE_NONE = 0,
+    RUN_STATE_LOAD_WORLD,
     RUN_STATE_PROCESSING_PLAYER,
     RUN_STATE_PROCESSING_ENTITIES,
     RUN_STATE_INVENTORY_MENU,
@@ -275,15 +292,15 @@ struct inspect_state
     };
 };
 
+enum { MAX_WORLDS = 32 };
+
 struct game_state
 {
     b32 IsInitialized;
 
-    memory_arena RootArena;
-    memory_arena WorldArena;
     memory_arena ResourceArena;
-    memory_arena TrArenaA;
-    memory_arena TrArenaB;
+    memory_arena ScratchArenaA;
+    memory_arena ScratchArenaB;
 
     sav_font *TitleFont;
     sav_font *BodyFont;
@@ -306,13 +323,16 @@ struct game_state
     sav_render_texture LightingRenderTex;
     sav_render_texture DebugOverlay;
 
-    world World;
+    world *World;
+    int CurrentWorld;
+    world *OtherWorlds[MAX_WORLDS];
 
     vec2 *GroundPoints;
     vec2 *GroundRots;
     int GroundPointCount;
 
     b32 IgnoreFieldOfView;
+    b32 PlayerFovDirty;
 
     run_state RunState;
 
@@ -321,6 +341,7 @@ struct game_state
     entity *PlayerRequestedPickupItemItemPickup;
 
     inspect_state InspectState;
+
     
     entity *EntityToHit;
 };
@@ -346,9 +367,9 @@ inline b32 EntityExists(entity *Entity) { return Entity->Type > 0; }
 inline b32 EntityIsDead(entity *Entity) { return Entity->Health <= 0; }
 
 inline rect
-GetWorldDestRect(world World, vec2i P)
+GetWorldDestRect(world *World, vec2i P)
 {
-    return Rect(P.X * World.TilePxW, P.Y * World.TilePxH, World.TilePxW, World.TilePxH);
+    return Rect(P.X * World->TilePxW, P.Y * World->TilePxH, World->TilePxW, World->TilePxH);
 }
 
 inline rect

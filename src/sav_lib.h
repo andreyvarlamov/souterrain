@@ -112,6 +112,7 @@ enum tex_filter_mode
 };
 
 SAV_API game_memory AllocGameMemory(size_t Size);
+SAV_API memory_arena AllocArena(size_t Size);
 SAV_API void DumpGameMemory(game_memory GameMemory);
 SAV_API void ReloadGameMemoryDump(game_memory GameMemory);
 

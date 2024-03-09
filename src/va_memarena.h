@@ -5,24 +5,27 @@
 
 struct memory_arena
 {
-    size_t Size;
     u8 *Base;
+
+    size_t Size;
     size_t Used;
     size_t PrevUsed;
     size_t FrozenUsed;
     size_t FrozenPrevUsed;
+
+    // TODO: FreezeCount
 #ifdef SAV_DEBUG
     b32 Frozen;
 #endif
 };
 
 inline memory_arena
-MemoryArena(u8 *Base, size_t Size)
+MemoryArena(void *Base, size_t Size)
 {
     memory_arena Arena = {};
     
     Arena.Size = Size;
-    Arena.Base = Base;
+    Arena.Base = (u8 *) Base;
 
     return Arena;
 }
@@ -69,6 +72,7 @@ MemoryArena_ResizePreviousPushArray_(memory_arena *Arena, size_t Size)
 #define MemoryArena_PushArray(Arena, Count, type) (type *) MemoryArena_PushSize_(Arena, Count * sizeof(type))
 #define MemoryArena_PushBytes(Arena, ByteCount) (u8 *) MemoryArena_PushSize_(Arena, ByteCount)
 #define MemoryArena_PushArrayAndZero(Arena, Count, type) (type *) MemoryArena_PushSizeAndZero_(Arena, Count * sizeof(type))
+#define MemoryArena_PushStructAndZero(Arena, type) (type *) MemoryArena_PushSizeAndZero_(Arena, sizeof(type))
 #define MemoryArena_ResizePreviousPushArray(Arena, Count, type) MemoryArena_ResizePreviousPushArray_(Arena, Count * sizeof(type))
 
 inline memory_arena

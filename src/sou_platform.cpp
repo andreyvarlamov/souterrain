@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 
     InitGameCode("bin/souterrain.dll", "UpdateAndRender", (void **) &UpdateAndRender);
 
-    game_memory GameMemory = AllocGameMemory(Megabytes(128));
+    game_memory GameMemory = AllocGameMemory(Megabytes(4));
 
     SetTargetFPS(60.0);
 
@@ -31,15 +31,15 @@ int main(int argc, char **argv)
 
         PollEvents(&ShouldQuit);
 
-        if (KeyPressed(SDL_SCANCODE_F5))
-        {
-            DumpGameMemory(GameMemory);
-        }
+        // if (KeyPressed(SDL_SCANCODE_F5))
+        // {
+        //     DumpGameMemory(GameMemory);
+        // }
 
-        if (KeyPressed(SDL_SCANCODE_F7))
-        {
-            ReloadGameMemoryDump(GameMemory);
-        }
+        // if (KeyPressed(SDL_SCANCODE_F7))
+        // {
+        //     ReloadGameMemoryDump(GameMemory);
+        // }
 
         b32 Reloaded = ReloadGameCode((void **) &UpdateAndRender);
 

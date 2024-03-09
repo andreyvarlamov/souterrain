@@ -65,7 +65,7 @@ GenerateVignette(memory_arena *TrArenaA)
 }
 
 void
-DrawGround(game_state *GameState)
+DrawGround(game_state *GameState, world *World, memory_arena *ScratchArena)
 {
     glEnable(GL_STENCIL_TEST);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
@@ -82,23 +82,23 @@ DrawGround(game_state *GameState)
 
             for (int GroundVariant = 1; GroundVariant <= 3; GroundVariant++)
             {
-                MemoryArena_Freeze(&GameState->TrArenaA);
+                MemoryArena_Freeze(ScratchArena);
                 
-                int TileCount = GameState->World.Width * GameState->World.Height;
-                vec3 *VertPositions = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec3);
-                vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec4);
-                vec4 *VertColors = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec4);
+                int TileCount = World->Width * World->Height;
+                vec3 *VertPositions = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec3);
+                vec4 *VertTexCoords = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec4);
+                vec4 *VertColors = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec4);
                 int CurrentVert = 0;
-                u32 *VertIndices = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 6, u32);
+                u32 *VertIndices = MemoryArena_PushArray(ScratchArena, TileCount * 6, u32);
                 int CurrentIndex = 0;
 
-                for (int WorldI = 0; WorldI < GameState->World.Width * GameState->World.Height; WorldI++)
+                for (int WorldI = 0; WorldI < World->Width * World->Height; WorldI++)
                 {
-                    b32 TileInitialized = GameState->World.TilesInitialized[WorldI];
-                    u8 DarknessLevel = GameState->World.DarknessLevels[WorldI];
+                    b32 TileInitialized = World->TilesInitialized[WorldI];
+                    u8 DarknessLevel = World->DarknessLevels[WorldI];
                     if (!TileInitialized || DarknessLevel == DARKNESS_UNSEEN) continue;
                     
-                    switch (GameState->World.Tiles[WorldI])
+                    switch (World->Tiles[WorldI])
                     {
                         case TILE_GRASS:
                         {
@@ -117,8 +117,8 @@ DrawGround(game_state *GameState)
                         } break;
                     }
                         
-                    vec2i WorldP = IdxToXY(WorldI, GameState->World.Width);
-                    rect Dest = GetWorldDestRect(GameState->World, WorldP);
+                    vec2i WorldP = IdxToXY(WorldI, World->Width);
+                    rect Dest = GetWorldDestRect(World, WorldP);
 
                     vec3 Positions[4];
                     RectGetPoints(Dest, Positions);
@@ -144,7 +144,7 @@ DrawGround(game_state *GameState)
                     DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
                 }
 
-                MemoryArena_Unfreeze(&GameState->TrArenaA);
+                MemoryArena_Unfreeze(ScratchArena);
             }
 
             glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -168,27 +168,28 @@ DrawGround(game_state *GameState)
                 {
                     glStencilFunc(GL_EQUAL, GroundVariant, 0xFF);
 
-                    MemoryArena_Freeze(&GameState->TrArenaA);
+                    MemoryArena_Freeze(ScratchArena);
                     
-                    vec3 *VertPositions = MemoryArena_PushArray(&GameState->TrArenaA, GameState->GroundPointCount * 4, vec3);
-                    vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->TrArenaA, GameState->GroundPointCount * 4, vec4);
-                    vec4 *VertColors = MemoryArena_PushArray(&GameState->TrArenaA, GameState->GroundPointCount * 4, vec4);
+                    vec3 *VertPositions = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec3);
+                    vec4 *VertTexCoords = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec4);
+                    vec4 *VertColors = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec4);
                     vec4 C = ColorV4(VA_WHITE);
-                    for (int i = 0; i < GameState->GroundPointCount * 4; i++)
+                    for (int VertColorI = 0; VertColorI < World->GroundSplatCount * 4; VertColorI++)
                     {
-                        VertColors[i] = C;
+                        VertColors[VertColorI] = C;
                     }
                     int CurrentVert = 0;
-                    u32 *VertIndices = MemoryArena_PushArray(&GameState->TrArenaA, GameState->GroundPointCount * 6, u32);
+                    u32 *VertIndices = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 6, u32);
                     int CurrentIndex = 0;
-                    
-                    for (int GroundPointI = 0; GroundPointI < GameState->GroundPointCount; GroundPointI++)
-                    {
-                        vec2 P = GameState->GroundPoints[GroundPointI];
-                        vec2 Rots = GameState->GroundRots[GroundPointI];
-                        f32 Scale = 10.0f;
 
-                        rect Dest = Rect(P.X, P.Y, GameState->GroundBrushRect.Width * Scale, GameState->GroundBrushRect.Height * Scale);
+                    ground_splat *GroundSplat = World->GroundSplats;
+                    for (int SplatI = 0; SplatI < World->GroundSplatCount; SplatI++, GroundSplat++)
+                    {
+                        vec2 P = GroundSplat->Position;
+                        
+                        rect Dest = Rect(P.X, P.Y,
+                                         GameState->GroundBrushRect.Width * GroundSplat->Scale,
+                                         GameState->GroundBrushRect.Height * GroundSplat->Scale);
                         Dest.X -= Dest.Width / 2.0f;
                         Dest.Y -= Dest.Height / 2.0f;
     
@@ -196,16 +197,16 @@ DrawGround(game_state *GameState)
                         RectGetPoints(Dest, Positions);
     
                         vec2 TexCoords[4];
-                        rect Source = Rect(0.0f, (GroundVariant-1) * GameState->GroundBrushRect.Height, GameState->GroundBrushRect.Width, GameState->GroundBrushRect.Height);
+                        rect Source = Rect(0.0f, (GroundVariant-1) * GameState->GroundBrushRect.Height,
+                                           GameState->GroundBrushRect.Width, GameState->GroundBrushRect.Height);
                         RectGetPoints(Source, TexCoords);
-                        Rotate4PointsAroundOrigin(TexCoords, RectGetMid(Source), Rots.E[0]);
+                        Rotate4PointsAroundOrigin(TexCoords, RectGetMid(Source), GroundSplat->Rotation);
                         NormalizeTexCoords(GameState->GroundBrushTex, TexCoords);
                         FlipTexCoords(TexCoords);
 
                         vec2 VigTexCoords[4];
                         rect VigSource = Rect(GameState->VigTex.Width, GameState->VigTex.Height);
                         RectGetPoints(VigSource, VigTexCoords);
-                        // Rotate4PointsAroundOrigin(VigTexCoords, RectGetMid(VigSource), Rots.E[1]);
                         NormalizeTexCoords(GameState->VigTex, VigTexCoords);
                         FlipTexCoords(VigTexCoords);
 
@@ -234,7 +235,7 @@ DrawGround(game_state *GameState)
 
                     DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
 
-                    MemoryArena_Unfreeze(&GameState->TrArenaA);
+                    MemoryArena_Unfreeze(ScratchArena);
                 }
 
                 glStencilMask(0xFF); // NOTE: So that stencil mask can be cleared glClear
@@ -255,22 +256,22 @@ DrawLighting(game_state *GameState)
     {
         ClearBackground(ColorAlpha(VA_WHITE, 0));
 
-        MemoryArena_Freeze(&GameState->TrArenaA);
+        MemoryArena_Freeze(&GameState->ScratchArenaA);
         
-        int TileCount = GameState->World.Width * GameState->World.Height;
-        vec3 *VertPositions = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec3);
-        vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec4);
-        vec4 *VertColors = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec4);
+        int TileCount = GameState->World->Width * GameState->World->Height;
+        vec3 *VertPositions = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec3);
+        vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
+        vec4 *VertColors = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
         int CurrentVert = 0;
-        u32 *VertIndices = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 6, u32);
+        u32 *VertIndices = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 6, u32);
         int CurrentIndex = 0;
         
         for (int WorldI = 0; WorldI < TileCount; WorldI++)
         {
-            u8 DarknessLevel = GameState->World.DarknessLevels[WorldI];
-            if (GameState->World.DarknessLevels[WorldI] == DARKNESS_SEEN)
+            u8 DarknessLevel = GameState->World->DarknessLevels[WorldI];
+            if (GameState->World->DarknessLevels[WorldI] == DARKNESS_SEEN)
             {
-                vec2i WorldP = IdxToXY(WorldI, GameState->World.Width);
+                vec2i WorldP = IdxToXY(WorldI, GameState->World->Width);
                 rect Dest = GetWorldDestRect(GameState->World, WorldP);
 
                 vec3 Positions[4];
@@ -300,7 +301,7 @@ DrawLighting(game_state *GameState)
             DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
         }
 
-        MemoryArena_Unfreeze(&GameState->TrArenaA);
+        MemoryArena_Unfreeze(&GameState->ScratchArenaA);
     }
     EndCameraMode(); EndTextureMode();
 }
@@ -322,22 +323,22 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
         // NOTE: Draw entities
         BeginCameraMode(&GameState->Camera);
         {
-            MemoryArena_Freeze(&GameState->TrArenaA);
+            MemoryArena_Freeze(&GameState->ScratchArenaA);
 
-            int TileCount = GameState->World.Width * GameState->World.Height;
-            vec3 *VertPositions = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec3);
-            vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec4);
-            vec4 *VertColors = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 4, vec4);
+            int TileCount = GameState->World->Width * GameState->World->Height;
+            vec3 *VertPositions = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec3);
+            vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
+            vec4 *VertColors = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
             int CurrentVert = 0;
-            u32 *VertIndices = MemoryArena_PushArray(&GameState->TrArenaA, TileCount * 6, u32);
+            u32 *VertIndices = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 6, u32);
             int CurrentIndex = 0;
 
             for (int WorldI = 0; WorldI < TileCount; WorldI++)
             {
-                u8 DarknessLevel = GameState->World.DarknessLevels[WorldI];
+                u8 DarknessLevel = GameState->World->DarknessLevels[WorldI];
                 if (DarknessLevel != DARKNESS_UNSEEN)
                 {
-                    entity *Entity = GameState->World.SpatialEntities[WorldI];
+                    entity *Entity = GameState->World->SpatialEntities[WorldI];
 
                     entity *EntityCursor = Entity;
                     while (EntityCursor)
@@ -359,7 +360,7 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
                     {
                         if (DarknessLevel == DARKNESS_IN_VIEW || (Entity->Type != ENTITY_NPC))
                         {
-                            vec2i WorldP = IdxToXY(WorldI, GameState->World.Width);
+                            vec2i WorldP = IdxToXY(WorldI, GameState->World->Width);
                             rect Dest = GetWorldDestRect(GameState->World, WorldP);
                             rect Source = GetGlyphSourceRect(GameState->GlyphAtlas, Entity->Glyph);
 
@@ -402,7 +403,7 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
                 DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
             }
 
-            MemoryArena_Unfreeze(&GameState->TrArenaA);
+            MemoryArena_Unfreeze(&GameState->ScratchArenaA);
         }
         EndCameraMode();
     }
@@ -544,23 +545,15 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 {
     game_state *GameState = (game_state *) GameMemory.Data;
 
-    b32 FirstFrame = false;
-
     // SECTION: INIT
     
     if (!GameState->IsInitialized)
     {
-        Assert(sizeof(game_state) < Megabytes(16));
-        u8 *RootArenaBase = (u8 *) GameMemory.Data + Megabytes(16);
-        size_t RootArenaSize = GameMemory.Size - Megabytes(16);
-        GameState->RootArena = MemoryArena(RootArenaBase, RootArenaSize);
+        Assert(sizeof(game_state) < Megabytes(GameMemory.Size));
 
-        GameState->WorldArena = MemoryArenaNested(&GameState->RootArena, Megabytes(32));
-        GameState->ResourceArena = MemoryArenaNested(&GameState->RootArena, Megabytes(16));
-        GameState->TrArenaA = MemoryArenaNested(&GameState->RootArena, Megabytes(16));
-        GameState->TrArenaB = MemoryArenaNested(&GameState->RootArena, Megabytes(16));
-
-        TraceLog("Root arena used mem: %zu/%zu MB", GameState->RootArena.Used / 1024 / 1024, GameState->RootArena.Size / 1024 / 1024);
+        GameState->ResourceArena = AllocArena(Megabytes(16));
+        GameState->ScratchArenaA = AllocArena(Megabytes(16));
+        GameState->ScratchArenaB = AllocArena(Megabytes(16));
 
         // NOTE: Shaders
         GameState->GroundShader = BuildCustomShader("res/ground.vs", "res/ground.fs");
@@ -593,7 +586,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->GlyphAtlas.GlyphPxWPad = GameState->GlyphAtlas.GlyphPxW + 2 * GameState->GlyphAtlas.GlyphPadX;
         GameState->GlyphAtlas.GlyphPxHPad = GameState->GlyphAtlas.GlyphPxH + 2 * GameState->GlyphAtlas.GlyphPadY;
         GameState->GlyphAtlasNormalTex = SavLoadTexture("res/NewFontNormals5.png");
-        GameState->VigTex = GenerateVignette(&GameState->TrArenaA);
+        GameState->VigTex = GenerateVignette(&GameState->ScratchArenaA);
         GameState->GroundBrushTex = SavLoadTexture("res/GroundBrushes5.png");
         GameState->GroundBrushRect = Rect(GameState->GroundBrushTex.Width, GameState->GroundBrushTex.Width);
         GameState->PlayerPortraitTex = SavLoadTexture("res/PlayerPortraitCursed.png");
@@ -608,47 +601,25 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         // NOTE: Audio
         // GameState->BackgroundMusic = LoadMusicStream("res/20240204 Calling.mp3");
 
-        // NOTE: World gen
-        GenerateWorld(GameState);
-
-        TraceLog("Allocated %zu KB for %d entities. Each entity is %zu bytes.",
-                 GameState->World.EntityMaxCount * sizeof(*GameState->World.Entities) / 1024,
-                 GameState->World.EntityMaxCount,
-                 sizeof(*GameState->World.Entities));
+        int WorldW = 100;
+        int WorldH = 100;
+        GameState->CurrentWorld = 0;
+        GameState->World = GameState->OtherWorlds[GameState->CurrentWorld] = GenerateWorld(WorldW, WorldH,
+                                                                                           GameState->GlyphAtlas.GlyphPxW,
+                                                                                           GameState->GlyphAtlas.GlyphPxH,
+                                                                                           &GameState->ScratchArenaA);
+        GameState->PlayerFovDirty = true;
+        
+        TraceLog("Generated world #%d. World arena used size: %zu KB. Each entity is %zu bytes.",
+                 GameState->CurrentWorld, GameState->World->Arena.Used, sizeof(*GameState->World->Entities));
 
         GameState->Camera.Rotation = 0.0f;
         CameraInitLogZoomSteps(&GameState->Camera, 0.2f, 5.0f, 5);
         GameState->Camera.Offset = GetWindowSize() / 2.0f;
-        GameState->Camera.Target = GetPxPFromTileP(&GameState->World, GameState->World.PlayerEntity->Pos);
-
-        // NOTE: Ground drawing state
-        int GroundPointsWidth = 32;
-        int GroundPointsHeight = 40;
-        GameState->GroundPointCount = GroundPointsWidth * GroundPointsHeight;
-        GameState->GroundPoints = MemoryArena_PushArray(&GameState->WorldArena, GameState->GroundPointCount, vec2);
-        GameState->GroundRots = MemoryArena_PushArray(&GameState->WorldArena, GameState->GroundPointCount, vec2);
-
-        f32 WorldPxWidth = (f32) GameState->World.TilePxW * GameState->World.Width;
-        f32 WorldPxHeight = (f32) GameState->World.TilePxH * GameState->World.Height;
-        f32 GroundPointDistX = WorldPxWidth / (GroundPointsWidth - 1);
-        f32 GroundPointDistY = WorldPxHeight / (GroundPointsHeight - 1);
-        for (int i = 0; i < GameState->GroundPointCount; i++)
-        {
-            vec2i P = IdxToXY(i, GroundPointsWidth);
-            f32 PxX = P.X * GroundPointDistX;
-            f32 PxY = P.Y * GroundPointDistY;
-            f32 RndX = (GetRandomFloat() * 0.1f - 0.05f) * GroundPointDistX;
-            f32 RndY = (GetRandomFloat() * 0.1f - 0.05f) * GroundPointDistY;
-            GameState->GroundPoints[i] = Vec2(PxX + RndX, PxY + RndY);
-
-            f32 SpriteRot = GetRandomFloat() * 360.0f - 180.0f;
-            f32 VigRot = GetRandomFloat() * 360.0f - 180.0f;
-            GameState->GroundRots[i] = Vec2(SpriteRot, VigRot);
-        }
+        GameState->Camera.Target = GetPxPFromTileP(GameState->World, GameState->World->PlayerEntity->Pos);
 
         // NOTE: Misc
         // PlayMusicStream(GameState->BackgroundMusic);
-        FirstFrame = true;
         GameState->IgnoreFieldOfView = false;
 
         GameState->IsInitialized = true;
@@ -675,9 +646,9 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     }
 
     // SECTION: GAME LOGIC PRE UPDATE
-    MemoryArena_Reset(&GameState->TrArenaA);
+    MemoryArena_Reset(&GameState->ScratchArenaA);
 
-    world *World = &GameState->World;
+    world *World = GameState->World;
     entity *Player = World->PlayerEntity;
 
     if (WindowSizeChanged())
@@ -698,9 +669,9 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         entity **DebugEntities;
         int Count;
-        GetAllEntitiesOfType(ENTITY_ITEM_PICKUP, World, &GameState->TrArenaA, &DebugEntities, &Count);
+        GetAllEntitiesOfType(ENTITY_ITEM_PICKUP, World, &GameState->ScratchArenaA, &DebugEntities, &Count);
 
-        GetAllEntitiesOfType(ENTITY_NPC, World, &GameState->TrArenaA, &DebugEntities, &Count);
+        GetAllEntitiesOfType(ENTITY_NPC, World, &GameState->ScratchArenaA, &DebugEntities, &Count);
 
         Noop;
     }
@@ -713,12 +684,49 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     vec2i MouseTileP = GetTilePFromPxP(World, MouseWorldPxP);
 
     // SECTION: GAME LOGIC UPDATE
-    b32 PlayerFovDirty = false;
-
     switch (GameState->RunState)
     {
         case RUN_STATE_NONE:
         {
+            GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+        } break;
+
+        case RUN_STATE_LOAD_WORLD:
+        {
+            Assert(GameState->CurrentWorld < MAX_WORLDS);
+                
+            if (GameState->OtherWorlds[GameState->CurrentWorld] == NULL)
+            {
+                int WorldW = 100;
+                int WorldH = 100;
+                world *NewWorld = GenerateWorld(WorldW, WorldH,
+                                                GameState->GlyphAtlas.GlyphPxW,
+                                                GameState->GlyphAtlas.GlyphPxH,
+                                                &GameState->ScratchArenaA);
+
+                TraceLog("Generated world #%d. World arena used size: %zu KB. Each entity is %zu bytes.",
+                         GameState->CurrentWorld, NewWorld->Arena.Used, sizeof(*GameState->World->Entities));
+
+                GameState->OtherWorlds[GameState->CurrentWorld] = NewWorld;
+            }
+
+            GameState->World = GameState->OtherWorlds[GameState->CurrentWorld];
+            
+            World = GameState->World;
+            entity *OldPlayer = Player;
+            Player = World->PlayerEntity;
+
+            if (OldPlayer != Player)
+            {
+                CopyEntity(OldPlayer, Player, World);
+            }
+
+            GameState->Camera.Target = GetPxPFromTileP(World, Player->Pos);
+
+            GameState->PlayerFovDirty = true;
+
+            TraceLog("Loaded world #%d.", GameState->CurrentWorld);
+                
             GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
         } break;
 
@@ -731,6 +739,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             b32 PlayerRequestedInventoryOpen = false;
             b32 PlayerRequestedPickupItems = false;
             b32 PlayerRequestedRangedAttack = false;
+            b32 PlayerRequestedNextLevel = false;
+            b32 PlayerRequestedPrevLevel = false;
             
             if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
@@ -746,16 +756,36 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressed(SDL_SCANCODE_I)) PlayerRequestedInventoryOpen = true;
             if (KeyPressed(SDL_SCANCODE_G)) PlayerRequestedPickupItems = true;
             if (KeyPressed(SDL_SCANCODE_F)) PlayerRequestedRangedAttack = true;
-            if (KeyPressed(SDL_SCANCODE_ESCAPE)) *Quit = true;
+            
+            if (KeyPressed(SDL_SCANCODE_PERIOD) &&
+                (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT)))
+            {
+                PlayerRequestedNextLevel = true;
+            }
+
+            if (KeyPressed(SDL_SCANCODE_COMMA) &&
+                (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT)))
+            {
+                PlayerRequestedPrevLevel = true;
+            }
 
             if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
             if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
             
             if (KeyPressed(SDL_SCANCODE_F1))
             {
-                GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
-                PlayerFovDirty = true;
+                GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView; 
+                GameState->PlayerFovDirty = true;
             }
+
+            if (KeyPressed(SDL_SCANCODE_ESCAPE))
+            {
+                if (GameState->InspectState.T == INSPECT_NONE)
+                {
+                    *Quit = true;
+                }
+            }
+
 
             entity *ActiveEntity = EntityTurnQueuePeek(World);
             if (ActiveEntity != Player)
@@ -772,7 +802,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 TurnUsed = true;
             }
 
-            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemDrop || PlayerRequestedTeleport || PlayerRequestedInventoryOpen || PlayerRequestedPickupItems || PlayerRequestedRangedAttack)
+            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemDrop || PlayerRequestedTeleport || PlayerRequestedInventoryOpen || PlayerRequestedPickupItems || PlayerRequestedRangedAttack || PlayerRequestedPrevLevel || PlayerRequestedNextLevel)
             {
                 if (PlayerRequestedItemDrop)
                 {
@@ -780,7 +810,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     {
                         entity ItemPickupTestTemplate = {};
                         ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-                        entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate, &GameState->WorldArena);
+                        entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
                         Assert(ItemPickup->Inventory);
 
                         item *ItemFromInventory = Player->Inventory;
@@ -820,6 +850,36 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 {
                     ResetInspectMenu(&GameState->InspectState);
                     GameState->RunState = RUN_STATE_RANGED_ATTACK;
+                }
+                else if (PlayerRequestedNextLevel)
+                {
+                    if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_STAIR_DOWN, World))
+                    {
+                        if (GameState->CurrentWorld < MAX_WORLDS - 1)
+                        {
+                            GameState->CurrentWorld++;
+                            GameState->RunState = RUN_STATE_LOAD_WORLD;
+                        }
+                        else
+                        {
+                            TraceLog("The way down is caved in.");
+                        }
+                    }
+                }
+                else if (PlayerRequestedPrevLevel)
+                {
+                    if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_STAIR_UP, World))
+                    {
+                        if (GameState->CurrentWorld > 0)
+                        {
+                            GameState->CurrentWorld--;
+                            GameState->RunState = RUN_STATE_LOAD_WORLD;
+                        }
+                        else
+                        {
+                            TraceLog("The way up is caved in.");
+                        }
+                    }
                 }
                 else if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedTeleport)
                 {
@@ -869,8 +929,9 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
             if (TurnUsed)
             {
-                if (World->TurnsPassed - World->PlayerEntity->LastHealTurn > World->PlayerEntity->RegenActionCost &&
-                    World->PlayerEntity->Health < World->PlayerEntity->MaxHealth && GetRandomValue(0, 2) == 0)
+                if (((World->TurnsPassed - World->PlayerEntity->LastHealTurn) > World->PlayerEntity->RegenActionCost) &&
+                    (World->PlayerEntity->Health < World->PlayerEntity->MaxHealth) &&
+                    (GetRandomValue(0, 2) == 0))
                 {
                     int RegenAmount = RollDice(1, World->PlayerEntity->RegenAmount);
                     World->PlayerEntity->Health += RegenAmount;
@@ -883,7 +944,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     TraceLog("Player regens %d health.", RegenAmount);
                 }
 
-                PlayerFovDirty = true;
+                GameState->PlayerFovDirty = true;
 
                 World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
                 ActiveEntity = EntityTurnQueuePeek(World);
@@ -915,7 +976,14 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         {
             if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
             if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
-            if (KeyPressed(SDL_SCANCODE_ESCAPE)) *Quit = true;
+
+            if (KeyPressed(SDL_SCANCODE_ESCAPE))
+            {
+                if (GameState->InspectState.T == INSPECT_NONE)
+                {
+                    *Quit = true;
+                }
+            }
 
             entity *StartingEntity = EntityTurnQueuePeek(World);
             entity *ActiveEntity = StartingEntity;
@@ -924,6 +992,22 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 if (ActiveEntity->Type == ENTITY_NPC)
                 {
                     UpdateNpcState(GameState, World, ActiveEntity);
+
+                    if (((World->TurnsPassed - ActiveEntity->LastHealTurn) > ActiveEntity->RegenActionCost) &&
+                        (ActiveEntity->Health < ActiveEntity->MaxHealth) &&
+                        (GetRandomValue(0, 2) == 0))
+                    {
+                        int RegenAmount = RollDice(1, ActiveEntity->RegenAmount);
+                        ActiveEntity->Health += RegenAmount;
+                        if (ActiveEntity->Health > ActiveEntity->MaxHealth)
+                        {
+                            ActiveEntity->Health = ActiveEntity->MaxHealth;
+                        }
+                        
+                        ActiveEntity->LastHealTurn = World->TurnsPassed;
+                        LogEntityAction(ActiveEntity, World, "%s (%d) regens %d health.", ActiveEntity->Name, ActiveEntity->DebugID, RegenAmount);
+                    }
+
                 }
         
                 World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
@@ -953,7 +1037,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             {
                 entity ItemPickupTestTemplate = {};
                 ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate, &GameState->WorldArena);
+                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
                 Assert(ItemPickup->Inventory);
 
                 if (AddItemToEntityInventory(GameState->PlayerRequestedDropItem, ItemPickup))
@@ -1079,7 +1163,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     {
                         InitializeP(NeighborP, World);
                         entity WallTemplate = Template_PumiceWall();
-                        AddEntity(World, NeighborP, &WallTemplate, &GameState->WorldArena);
+                        AddEntity(World, NeighborP, &WallTemplate);
                     }
                 }
             }
@@ -1100,7 +1184,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 if (Entity->Type == ENTITY_PLAYER)
                 {
                     GameState->IgnoreFieldOfView = true;
-                    PlayerFovDirty = true;
+                    GameState->PlayerFovDirty = true;
                 }
                 DeleteEntity(World, Entity);
             }
@@ -1108,9 +1192,13 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     }
 
     // NOTE: Update player FOV and darkness levels
-    if (PlayerFovDirty || FirstFrame)
+    if (GameState->PlayerFovDirty)
     {
-        if (!GameState->IgnoreFieldOfView)
+        if (GameState->IgnoreFieldOfView)
+        {
+            memset(World->PlayerEntity->FieldOfView, 0x1, World->Width * World->Height * sizeof(World->PlayerEntity->FieldOfView[0]));
+        }
+        else
         {
             memset(World->PlayerEntity->FieldOfView, 0, World->Width * World->Height * sizeof(World->PlayerEntity->FieldOfView[0]));
             CalculateExhaustiveFOV(World, World->PlayerEntity->Pos, World->PlayerEntity->FieldOfView, World->PlayerEntity->ViewRange);
@@ -1130,7 +1218,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         }
     }
 
-    Assert(ValidateEntitySpatialPartition(&GameState->World));
+    Assert(ValidateEntitySpatialPartition(GameState->World));
 
     // SECTION: RENDER
     // NOTE: Draw debug overlay
@@ -1171,23 +1259,23 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                        10, 10, 0,
                        VA_MAROON,
                        true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->TrArenaA);
+                       &GameState->ScratchArenaA);
 
-            DrawString(TextFormat("Tile: %d, %d", MouseTileP.X, MouseTileP.Y, GameState->World.DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World.Width)]),
+            DrawString(TextFormat("Tile: %d, %d", MouseTileP.X, MouseTileP.Y, GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
                        GameState->TitleFont,
                        GameState->TitleFont->PointSize,
                        10, 60, 0,
                        VA_MAROON,
                        true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->TrArenaA);
+                       &GameState->ScratchArenaA);
 
-            DrawString(TextFormat("Darkness Level: %d", GameState->World.DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World.Width)]),
+            DrawString(TextFormat("Darkness Level: %d", GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
                        GameState->TitleFont,
                        GameState->TitleFont->PointSize,
                        10, 110, 0,
                        VA_MAROON,
                        true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->TrArenaA);
+                       &GameState->ScratchArenaA);
 
             DrawString(TextFormat("Turn: %lld", World->TurnsPassed),
                        GameState->TitleFont,
@@ -1195,7 +1283,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                        10, 160, 0,
                        VA_MAROON,
                        true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->TrArenaA);
+                       &GameState->ScratchArenaA);
         }
 
         // NOTE: Player stats UI
@@ -1224,7 +1312,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                        160, 790, 0,
                        VA_WHITE,
                        false, VA_BLACK,
-                       &GameState->TrArenaA);
+                       &GameState->ScratchArenaA);
 
             DrawString(TextFormat("AC: %d", World->PlayerEntity->ArmorClass),
                        GameState->TitleFont,
@@ -1232,7 +1320,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                        160, 840, 0,
                        VA_WHITE,
                        false, VA_BLACK,
-                       &GameState->TrArenaA);
+                       &GameState->ScratchArenaA);
 
             // DrawString(TextFormat("Attack: %d", World->PlayerEntity->AttackModifier),
             //            GameState->TitleFont,
@@ -1240,7 +1328,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             //            160, 890, 0,
             //            VA_BLACK,
             //            false, VA_BLACK,
-            //            &GameState->TrArenaA);
+            //            &GameState->ScratchArenaA);
             
             DrawString(TextFormat("Damage: 1d%d", World->PlayerEntity->Damage),
                        GameState->TitleFont,
@@ -1248,7 +1336,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                        160, 940, 0,
                        VA_WHITE,
                        false, VA_BLACK,
-                       &GameState->TrArenaA);
+                       &GameState->ScratchArenaA);
         }
 
         // NOTE: Inventory UI
@@ -1291,7 +1379,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                LineX, LineY, 0,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
 
                     LineY += 40.0f;
                 }
@@ -1343,7 +1431,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                        LineX, LineY, 0,
                                        VA_WHITE,
                                        false, VA_BLACK,
-                                       &GameState->TrArenaA);
+                                       &GameState->ScratchArenaA);
 
                             LineY += 40.0f;
                         }
@@ -1373,7 +1461,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                1510, 10, 0,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
                 }
 
                 if (EntityToInspect->MaxHealth > 0)
@@ -1384,7 +1472,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                1510, 60, 0,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
 
                     DrawString(TextFormat("AC: %d", EntityToInspect->ArmorClass),
                                GameState->TitleFont,
@@ -1392,7 +1480,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                1510, 110, 0,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
 
                     // DrawString(TextFormat("Attack: %d", EntityToInspect->AttackModifier),
                     //            GameState->TitleFont,
@@ -1400,7 +1488,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     //            1510, 160, 0,
                     //            VA_BLACK,
                     //            false, VA_BLACK,
-                    //            &GameState->TrArenaA);
+                    //            &GameState->ScratchArenaA);
 
                     DrawString(TextFormat("Damage: 1d%d", EntityToInspect->Damage),
                                GameState->TitleFont,
@@ -1408,7 +1496,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                1510, 210, 0,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
                 }
             
                 if (EntityToInspect->Description)
@@ -1419,7 +1507,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                1510, 260, 400,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
                 }
             } break;
 
@@ -1439,7 +1527,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                1510, 10, 0,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
 
                     DrawString(TextFormat("%s", ItemToInspect->Description),
                                GameState->BodyFont,
@@ -1447,7 +1535,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                1510, 60, 400,
                                VA_WHITE,
                                false, VA_BLACK,
-                               &GameState->TrArenaA);
+                               &GameState->ScratchArenaA);
 
                     if (ItemToInspect->HaimaBonus > 0)
                     {
@@ -1457,7 +1545,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                    1510, 100, 0,
                                    VA_WHITE,
                                    false, VA_BLACK,
-                                   &GameState->TrArenaA);
+                                   &GameState->ScratchArenaA);
                     }
 
                     switch (GameState->InspectState.T)
@@ -1478,7 +1566,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                        1510, 1040, 0,
                                        VA_WHITE,
                                        false, VA_BLACK,
-                                       &GameState->TrArenaA);
+                                       &GameState->ScratchArenaA);
 
                         } break;
                         
@@ -1497,7 +1585,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                        1510, 1040, 0,
                                        VA_WHITE,
                                        false, VA_BLACK,
-                                       &GameState->TrArenaA);
+                                       &GameState->ScratchArenaA);
                         } break;
 
                         default: break;
@@ -1510,7 +1598,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         if (GameState->InspectState.T != INSPECT_NONE && !GameState->InspectState.JustOpened && !InspectMenuInternalButtonPressed)
         {
-            if ((MouseReleased(SDL_BUTTON_LEFT) || MouseReleased(SDL_BUTTON_RIGHT)))
+            if (MouseReleased(SDL_BUTTON_LEFT) || MouseReleased(SDL_BUTTON_RIGHT) || KeyPressed(SDL_SCANCODE_ESCAPE))
             {
                 ResetInspectMenu(&GameState->InspectState);
             }
@@ -1526,7 +1614,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
     DrawLighting(GameState);
     
-    DrawGround(GameState);
+    DrawGround(GameState, World, &GameState->ScratchArenaA);
 
     f32 LightHeight = 150.0f;
     f32 MaxAwayFromCenter = 50.0f;

@@ -156,9 +156,16 @@ game_memory
 AllocGameMemory(size_t Size)
 {
     game_memory GameMemory;
-    GameMemory.Size = Megabytes(128);
+    GameMemory.Size = Size;
     GameMemory.Data = Win32AllocMemory(GameMemory.Size);
     return GameMemory;
+}
+
+memory_arena
+AllocArena(size_t Size)
+{
+    void *AllocatedMemory = Win32AllocMemory(Size);
+    return MemoryArena((u8 *)AllocatedMemory, Size);
 }
 
 void

@@ -79,6 +79,42 @@ Template_XetelStatue()
 ;
 #endif
 
+TEMPLATE_FUNC entity
+Template_StairsUp()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+
+    Template.Type = ENTITY_STAIR_UP;
+    Template.Color = VA_ORANGE;
+    Template.Glyph = '<';
+    Template.Name = "Stairs Up";
+    Template.Description = "Press Shift+W to go to the higher level of Souterrain.";
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_StairsDown()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+
+    Template.Type = ENTITY_STAIR_DOWN;
+    Template.Color = VA_ORANGE;
+    Template.Glyph = '>';
+    Template.Name = "Stairs Down";
+    Template.Description = "Press Shift+X to go to the lower level of Souterrain.";
+
+    return Template;
+}
+#else
+;
+#endif
+
 //////////////////////////
 // SECTION: NPCS /////////
 //////////////////////////

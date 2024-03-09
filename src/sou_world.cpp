@@ -211,7 +211,7 @@ void EntityTurnQueueInsert(world *World, entity *Entity, int NewCostOwed);
 enum { ENTITY_HEALTH_DEFAULT = 100 };
 
 entity *
-AddEntity(world *World, vec2i Pos, entity *CopyEntity, memory_arena *WorldArena)
+AddEntity(world *World, vec2i Pos, entity *CopyEntity)
 {
     entity *Entity = FindNextFreeEntitySlot(World);
 
@@ -221,7 +221,7 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity, memory_arena *WorldArena)
     if (NeedFOV && Entity->FieldOfView == NULL)
     {
         // TODO: Allocate only for the entity max range rect
-        Entity->FieldOfView = MemoryArena_PushArray(WorldArena, World->Width * World->Height, u8);
+        Entity->FieldOfView = MemoryArena_PushArray(&World->Arena, World->Width * World->Height, u8);
     }
 
     b32 NeedInventory = Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_ITEM_PICKUP;
@@ -229,7 +229,7 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity, memory_arena *WorldArena)
     {
         if (Entity->Inventory == NULL)
         {
-            Entity->Inventory = MemoryArena_PushArrayAndZero(WorldArena, INVENTORY_SLOTS_PER_ENTITY, item);
+            Entity->Inventory = MemoryArena_PushArrayAndZero(&World->Arena, INVENTORY_SLOTS_PER_ENTITY, item);
         }
         else
         {
@@ -295,6 +295,15 @@ GetRandomRoomP(room *Room)
     return Vec2I(X, Y);
 }
 
+vec2i
+GetCenterRoomP(room *Room)
+{
+    int X = Room->X + Room->W/2;
+    int Y = Room->Y + Room->H/2;
+
+    return Vec2I(X, Y);
+}
+
 // SECTION: WORLD GEN
 void
 GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsMax, int *RoomCount)
@@ -303,7 +312,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
 
     for (int i = 0; i < TileCount; i++)
     {
-        World->Tiles[i] = TILE_WATER;
+        World->Tiles[i] = TILE_STONE;
     }
 
     int SizeMin = 6;
@@ -511,7 +520,8 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
             {
                 case ROOM_ENTRANCE:
                 {
-                    // TODO: Stairs in the middle
+                    vec2i P = GetCenterRoomP(Room);
+                    GeneratedMap[XYToIdx(P, World->Width)] = GEN_TILE_STAIR_UP;
                     // TODO: Novice item drop close to the middle
                     // TODO: A low level enemy close to the middle
                 } break;
@@ -536,7 +546,8 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
 
                 case ROOM_EXIT:
                 {
-                    // TODO: Stairs in the middle
+                    vec2i P = GetCenterRoomP(Room);
+                    GeneratedMap[XYToIdx(P, World->Width)] = GEN_TILE_STAIR_DOWN;
                     // TODO: Level boss
                 } break;;
 
@@ -546,20 +557,98 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
     }
 }
 
-#define GENERATED_MAP 1
+void
+RemoveItemEffectsFromEntity(item *Item, entity *Entity);
 
 void
-GenerateWorld(game_state *GameState)
-{
-    world *World = &GameState->World;
-    World->Width = 100;
-    World->Height = 100;
-    World->TilePxW = GameState->GlyphAtlas.GlyphPxW;
-    World->TilePxH = GameState->GlyphAtlas.GlyphPxH;
+ApplyItemEffectsToEntity(item *Item, entity *Entity);
 
-    World->TilesInitialized = MemoryArena_PushArrayAndZero(&GameState->WorldArena, World->Width * World->Height, u8);
-    World->Tiles = MemoryArena_PushArray(&GameState->WorldArena, World->Width * World->Height, u8);
-    World->DarknessLevels = MemoryArena_PushArray(&GameState->WorldArena, World->Width * World->Height, u8);
+void
+CopyEntityInventory(entity *From, entity *To)
+{
+    item *ToInventoryItem = To->Inventory;
+    item *FromInventoryItem = From->Inventory;
+    for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ToInventoryItem++, FromInventoryItem++)
+    {
+        *ToInventoryItem = *FromInventoryItem;
+        // if (ToInventoryItem->ItemType != ITEM_NONE)
+        // {
+        //     RemoveItemEffectsFromEntity(ToInventoryItem, To);
+        //     ToInventoryItem->ItemType = ITEM_NONE;
+        // }
+
+        // if (FromInventoryItem->ItemType != ITEM_NONE)
+        // {
+        //     *ToInventoryItem = *FromInventoryItem;
+        //     ApplyItemEffectsToEntity(ToInventoryItem, To);
+        // }
+    }
+}
+
+void
+CopyEntity(entity *From, entity *To, world *ToWorld)
+{
+    To->Type = From->Type;
+    To->Flags = From->Flags;
+    
+    To->Glyph = From->Glyph;
+    To->Color = From->Color;
+
+    To->ActionCost = From->ActionCost;
+
+    To->ViewRange = From->ViewRange;
+    To->RangedRange = From->RangedRange;
+
+    Assert(To->FieldOfView || !From->FieldOfView);
+    // NOTE: No need to copy of fov as it's world specific
+
+    To->NpcState = From->NpcState;
+    To->Target = From->Target;
+
+    To->Name = From->Name;
+    To->Description = From->Description;
+
+    To->Health = From->Health;
+    To->MaxHealth = From->MaxHealth;
+    To->ArmorClass = From->ArmorClass;
+    To->Damage = From->Damage;
+
+    To->LastHealTurn = From->LastHealTurn;
+    To->RegenActionCost = From->RegenActionCost;
+    To->RegenAmount = From->RegenAmount;
+
+    To->Haima = From->Haima;
+    To->Kitrina = From->Kitrina;
+    To->Melana = From->Melana;
+    To->Sera = From->Sera;
+
+    To->HaimaBonus = From->HaimaBonus;
+
+    Assert(To->Inventory || !From->Inventory);
+    CopyEntityInventory(From, To);
+}
+
+#define GENERATED_MAP 1
+
+world *
+GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *ScratchArena)
+{
+    // SECTION: PREPARE WORLD STATE
+    
+    // TODO: The allocation size should depend on the world size
+    // = MemoryArena_PushStructAndZero(WorldArena, world);
+    memory_arena NewWorldArena = AllocArena(Megabytes(8));
+    world *World = MemoryArena_PushStruct(&NewWorldArena, world);
+    World->Arena = NewWorldArena;
+    World->Width = WorldW;
+    World->Height = WorldH;
+    World->TilePxW = TilePxW;
+    World->TilePxH = TilePxH;
+    memory_arena *WorldArena = &World->Arena;
+
+    World->TilesInitialized = MemoryArena_PushArrayAndZero(WorldArena, World->Width * World->Height, u8);
+    World->Tiles = MemoryArena_PushArray(WorldArena, World->Width * World->Height, u8);
+    World->DarknessLevels = MemoryArena_PushArray(WorldArena, World->Width * World->Height, u8);
     for (int i = 0; i < World->Width * World->Height; i++)
     {
         World->DarknessLevels[i] = DARKNESS_UNSEEN;
@@ -567,26 +656,29 @@ GenerateWorld(game_state *GameState)
 
     World->EntityUsedCount = 0;
     World->EntityMaxCount = ENTITY_MAX_COUNT;
-    World->Entities = MemoryArena_PushArray(&GameState->WorldArena, World->EntityMaxCount, entity);
+    World->Entities = MemoryArena_PushArray(WorldArena, World->EntityMaxCount, entity);
 
-    World->SpatialEntities = MemoryArena_PushArray(&GameState->WorldArena, World->Width * World->Height, entity *);
+    World->SpatialEntities = MemoryArena_PushArray(WorldArena, World->Width * World->Height, entity *);
 
     World->TurnQueueCount = 0;
     World->TurnQueueMax = World->EntityMaxCount;
-    World->EntityTurnQueue = MemoryArena_PushArray(&GameState->WorldArena, World->TurnQueueMax, entity_queue_node);
+    World->EntityTurnQueue = MemoryArena_PushArray(WorldArena, World->TurnQueueMax, entity_queue_node);
 
     entity PumiceWall = Template_PumiceWall();
     entity LatenaStatue = Template_LatenaStatue();
     entity XetelStatue = Template_XetelStatue();
+    entity StairsUp = Template_StairsUp();
+    entity StairsDown = Template_StairsDown();
 
+    // SECTION: GENERATE MAP
 #if (GENERATED_MAP == 1)
     
-    u8 *GeneratedEntityMap = MemoryArena_PushArrayAndZero(&GameState->TrArenaA, World->Width * World->Height, u8);
+    u8 *GeneratedEntityMap = MemoryArena_PushArrayAndZero(ScratchArena, World->Width * World->Height, u8);
     int RoomsMax = 50;
     int RoomCount;
-    room *GeneratedRooms = MemoryArena_PushArrayAndZero(&GameState->TrArenaA, RoomsMax, room);
+    room *GeneratedRooms = MemoryArena_PushArrayAndZero(ScratchArena, RoomsMax, room);
     GenerateRoomMap(World, GeneratedEntityMap, GeneratedRooms, RoomsMax, &RoomCount);
-    MemoryArena_ResizePreviousPushArray(&GameState->TrArenaA, RoomCount, room);
+    MemoryArena_ResizePreviousPushArray(ScratchArena, RoomCount, room);
 
     vec2i PlayerP = Vec2I(GeneratedRooms[0].X + GeneratedRooms[0].W / 2, GeneratedRooms[0].Y + GeneratedRooms[0].H / 2);
 
@@ -596,29 +688,41 @@ GenerateWorld(game_state *GameState)
     // {
     //     if (GeneratedMap[i] == 1)
     //     {
-    //         AddEntity(&GameState->World, IdxToXY(i, World->Width), &G, &GameState->WorldArena);
+    //         AddEntity(World, IdxToXY(i, World->Width), &G);
     //     }
     //     if (GeneratedMap[i] == 2)
     //     {
-    //         AddEntity(&GameState->World, IdxToXY(i, World->Width), &W, &GameState->WorldArena);
+    //         AddEntity(World, IdxToXY(i, World->Width), &W);
     //     }
     // }
 
-    // NOTE: Add walls
+    // NOTE: Add structures
     for (int WorldI = 0; WorldI < World->Width * World->Height; WorldI++)
     {
         switch (GeneratedEntityMap[WorldI])
         {
             case GEN_TILE_WALL:
             {
-                AddEntity(&GameState->World, IdxToXY(WorldI, World->Width), &PumiceWall, &GameState->WorldArena);
+                AddEntity(World, IdxToXY(WorldI, World->Width), &PumiceWall);
             } break;
 
             case GEN_TILE_STATUE:
             {
                 entity *Statue = GetRandomValue(0, 2) ? &LatenaStatue : &XetelStatue;
-                AddEntity(&GameState->World, IdxToXY(WorldI, World->Width), Statue, &GameState->WorldArena);
+                AddEntity(World, IdxToXY(WorldI, World->Width), Statue);
             } break;
+
+            case GEN_TILE_STAIR_UP:
+            {
+                AddEntity(World, IdxToXY(WorldI, World->Width), &StairsUp);
+            } break;
+
+            case GEN_TILE_STAIR_DOWN:
+            {
+                AddEntity(World, IdxToXY(WorldI, World->Width), &StairsDown);
+            } break;
+
+            default: break;
         }
     }
 
@@ -634,24 +738,25 @@ GenerateWorld(game_state *GameState)
 
     for (int X = 0; X < World->Width; X++)
     {
-        AddEntity(World, Vec2I(X, 0), &PumiceWall, &GameState->WorldArena);
-        AddEntity(World, Vec2I(X, World->Height - 1), &PumiceWall, &GameState->WorldArena);
+        AddEntity(World, Vec2I(X, 0), &PumiceWall);
+        AddEntity(World, Vec2I(X, World->Height - 1), &PumiceWall);
     }
 
     for (int Y = 1; Y < World->Height - 1; Y++)
     {
-        AddEntity(World, Vec2I(0, Y), &PumiceWall, &GameState->WorldArena);
-        AddEntity(World, Vec2I(World->Width - 1, Y), &PumiceWall, &GameState->WorldArena);
+        AddEntity(World, Vec2I(0, Y), &PumiceWall);
+        AddEntity(World, Vec2I(World->Width - 1, Y), &PumiceWall);
     }
     
 #endif
 
+    // SECTION: ADD ENTITIES
     entity Player = Template_Player();
-    World->PlayerEntity = AddEntity(World, PlayerP, &Player, &GameState->WorldArena);
+    World->PlayerEntity = AddEntity(World, PlayerP, &Player);
 
     entity ItemPickupTestTemplate = {};
     ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-    entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
+    entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate);
 
     ItemPickupTest->Inventory[0] = Template_HaimaPotion();
     ItemPickupTest->Inventory[1] = Template_ShortBow();
@@ -659,7 +764,7 @@ GenerateWorld(game_state *GameState)
     ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
     
-    ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate, &GameState->WorldArena);
+    ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate);
 
     ItemPickupTest->Inventory[0] = Template_ShoddyPickaxe();
     ItemPickupTest->Inventory[1] = Template_Sword();
@@ -682,7 +787,7 @@ GenerateWorld(game_state *GameState)
         vec2i P = Vec2I(X, Y);
         if (!CheckCollisions(World, P).Collided)
         {
-            AddEntity(World, P, &AetherFly, &GameState->WorldArena);
+            AddEntity(World, P, &AetherFly);
             EnemyCount++;
         }
         AttemptCount++;
@@ -700,7 +805,7 @@ GenerateWorld(game_state *GameState)
         vec2i P = Vec2I(X, Y);
         if (!CheckCollisions(World, P).Collided)
         {
-            AddEntity(World, P, &AetherFly, &GameState->WorldArena);
+            AddEntity(World, P, &AetherFly);
             EnemyCount++;
         }
         AttemptCount++;
@@ -727,7 +832,7 @@ GenerateWorld(game_state *GameState)
                         vec2i P = Vec2I(X, Y);
                         if (!CheckCollisions(World, P).Collided)
                         {
-                            AddEntity(World, P, &AetherFly, &GameState->WorldArena);
+                            AddEntity(World, P, &AetherFly);
                             EnemyCount++;
                         }
                         Attempt++;
@@ -742,9 +847,43 @@ GenerateWorld(game_state *GameState)
     // NOTE: Signed overflow so we know which entities got added post world gen :)
     World->EntityCurrentDebugID = INT_MAX;
     World->EntityCurrentDebugID++;
+#endif
+
+    // SECTION: GENERATE GROUND SPLATS
+    // TODO: Instead of hardcoding like this, calculate scale and dist between splats based on ground brush tex size
+    f32 Scale = 10.0f;
+    f32 DistBwSplatsX = 135.0f;
+    f32 DistBwSplatsY = 135.0f;
+
+    f32 WorldPxWidth = (f32) World->TilePxW * World->Width;
+    f32 WorldPxHeight = (f32) World->TilePxH * World->Height;
+    
+    int GroundSplatXCount = (int) (WorldPxWidth / DistBwSplatsX) + 1;
+    int GroundSplatYCount = (int) (WorldPxHeight / DistBwSplatsY) + 1;
+    World->GroundSplatCount = GroundSplatXCount * GroundSplatYCount;
+    World->GroundSplats = MemoryArena_PushArray(WorldArena, World->GroundSplatCount, ground_splat);
+    
+    {
+        ground_splat *GroundSplat = World->GroundSplats;
+        for (int SplatI = 0; SplatI < World->GroundSplatCount; SplatI++, GroundSplat++)
+        {
+            vec2i P = IdxToXY(SplatI, GroundSplatXCount);
+            f32 PxX = P.X * DistBwSplatsX;
+            f32 PxY = P.Y * DistBwSplatsY;
+            f32 RndX = (GetRandomFloat() * 0.1f - 0.05f) * DistBwSplatsX;
+            f32 RndY = (GetRandomFloat() * 0.1f - 0.05f) * DistBwSplatsY;
+            GroundSplat->Position = Vec2(PxX + RndX, PxY + RndY);
+
+            f32 SpriteRot = GetRandomFloat() * 360.0f - 180.0f;
+            GroundSplat->Rotation = SpriteRot;
+
+            GroundSplat->Scale = Scale;
+        }
+    }
 
     TraceLog("Generated world. Added %d enemies.", EnemyCount);
-#endif
+
+    return World;
 }
 
 // SECTION: PATHFINDING
@@ -1489,7 +1628,7 @@ MoveEntity(world *World, entity *Entity, vec2i NewP, b32 *Out_TurnUsed)
         Entity->Pos = NewP;
         
 #if 0
-        TraceLog("%s (%d) moves without hitting anyone", Entity->Name, Entity->DebugID);
+        LogEntityAction(Entity, World, "%s (%d) moves without hitting anyone", Entity->Name, Entity->DebugID);
 #endif
         
         *Out_TurnUsed = true;
@@ -1514,7 +1653,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             if (LookAround(Entity, World))
             {
                 Entity->NpcState = NPC_STATE_HUNTING;
-                TraceLog("%s (%d): player is in FOV. Now hunting player", Entity->Name, Entity->DebugID);
+                LogEntityAction(Entity, World, "%s (%d): player is in FOV. Now hunting player", Entity->Name, Entity->DebugID);
             }
         } break;
 
@@ -1532,7 +1671,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                 }
 
                 Entity->NpcState = NPC_STATE_SEARCHING;
-                TraceLog("%s (%d): player is missing. Searching where last seen: (%d, %d)", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
+                LogEntityAction(Entity, World, "%s (%d): player is missing. Searching where last seen: (%d, %d)", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
             }
             else
             {
@@ -1546,12 +1685,12 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             if (LookAround(Entity, World))
             {
                 Entity->NpcState = NPC_STATE_HUNTING;
-                TraceLog("%s (%d): found player. Now hunting player", Entity->Name, Entity->DebugID);
+                LogEntityAction(Entity, World, "%s (%d): found player. Now hunting player", Entity->Name, Entity->DebugID);
             }
             else if (Entity->Pos == Entity->Target)
             {
                 Entity->NpcState = NPC_STATE_IDLE;
-                TraceLog("%s (%d): no player in last known location. Now idle", Entity->Name, Entity->DebugID);
+                LogEntityAction(Entity, World, "%s (%d): no player in last known location. Now idle", Entity->Name, Entity->DebugID);
             }
         } break;
 
@@ -1591,7 +1730,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                 }
 
                 b32 TurnUsed;
-                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
+                MoveEntity(GameState->World, Entity, NewEntityP, &TurnUsed);
             }
         } break;
 
@@ -1600,19 +1739,19 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             Entity->Target = World->PlayerEntity->Pos;
             path_result Path = CalculatePath(World,
                                              Entity->Pos, World->PlayerEntity->Pos,
-                                             &GameState->TrArenaA, &GameState->TrArenaB,
+                                             &GameState->ScratchArenaA, &GameState->ScratchArenaB,
                                              0);
             
             if (Path.FoundPath && Path.Path)
             {
                 vec2i NewEntityP = Path.Path[0];
                 b32 TurnUsed;
-                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
+                MoveEntity(GameState->World, Entity, NewEntityP, &TurnUsed);
             }
             // else
             // {
             //     Entity->NpcState = NPC_STATE_IDLE;
-            //     TraceLog("%s (%d): cannot path to player (%d, %d). Now idle", Entity->Name, Entity->DebugID, World->PlayerEntity->Pos.X, World->PlayerEntity->Pos.Y);
+            //     LogEntityAction(Entity, World, "%s (%d): cannot path to player (%d, %d). Now idle", Entity->Name, Entity->DebugID, World->PlayerEntity->Pos.X, World->PlayerEntity->Pos.Y);
             // }
         } break;
 
@@ -1620,20 +1759,20 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
         {
             path_result Path = CalculatePath(World,
                                              Entity->Pos, Entity->Target,
-                                             &GameState->TrArenaA, &GameState->TrArenaB,
+                                             &GameState->ScratchArenaA, &GameState->ScratchArenaB,
                                              0);
             
             if (Path.FoundPath && Path.Path)
             {
                 vec2i NewEntityP = Path.Path[0];
                 b32 TurnUsed;
-                MoveEntity(&GameState->World, Entity, NewEntityP, &TurnUsed);
+                MoveEntity(GameState->World, Entity, NewEntityP, &TurnUsed);
             }
-            else
-            {
-                Entity->NpcState = NPC_STATE_IDLE;
-                TraceLog("%s (%d): cannot path to target (%d, %d). Now idle", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
-            }
+            // else
+            // {
+            //     Entity->NpcState = NPC_STATE_IDLE;
+            //     LogEntityAction(Entity, World, "%s (%d): cannot path to target (%d, %d). Now idle", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
+            // }
         } break;
 
         default:
