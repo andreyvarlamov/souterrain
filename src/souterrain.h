@@ -91,6 +91,8 @@ struct entity
 
     u8 NpcState;
     vec2i Target;
+    int SwarmID;
+    int SearchTurns;
 
     const char *Name;
     const char *Description;
@@ -197,6 +199,13 @@ struct ground_splat
     f32 Scale;
 };
 
+struct swarm
+{
+    int Cooldown;
+};
+
+enum { MAX_SWARMS = 64 };
+
 struct world
 {
     memory_arena Arena;
@@ -224,6 +233,9 @@ struct world
 
     int GroundSplatCount;
     ground_splat *GroundSplats;
+
+    int SwarmCount;
+    swarm Swarms[MAX_SWARMS];
     
     entity *PlayerEntity;
 

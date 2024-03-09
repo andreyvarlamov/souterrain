@@ -53,7 +53,7 @@ GetAllEntitiesOfType(entity_type EntityType, world *World, memory_arena *TrArena
 }
 
 collision_info
-CheckCollisions(world *World, vec2i P)
+CheckCollisions(world *World, vec2i P, b32 IgnoreNPCs = false)
 {
     collision_info CI;
     
@@ -71,7 +71,7 @@ CheckCollisions(world *World, vec2i P)
             // if (EntityExists(Entity) && Entity->Pos == P && CheckFlags(Entity->Flags, ENTITY_IS_BLOCKING))
             if (EntityExists(Entity) && Entity->Pos == P)
             {
-                if (CheckFlags(Entity->Flags, ENTITY_IS_BLOCKING))
+                if (CheckFlags(Entity->Flags, ENTITY_IS_BLOCKING) && (!IgnoreNPCs || Entity->Type != ENTITY_NPC))
                 {
                     FoundBlocking = true;
                     break;
@@ -287,10 +287,10 @@ ValidateEntitySpatialPartition(world *World)
 }
 
 vec2i
-GetRandomRoomP(room *Room)
+GetRandomRoomP(room *Room, int Pad)
 {
-    int X = GetRandomValue(Room->X, Room->X+Room->W);
-    int Y = GetRandomValue(Room->Y, Room->Y+Room->H);
+    int X = GetRandomValue(Room->X+Pad, Room->X+Room->W-Pad);
+    int Y = GetRandomValue(Room->Y+Pad, Room->Y+Room->H-Pad);
 
     return Vec2I(X, Y);
 }
@@ -492,13 +492,14 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
             {
                 vec2i Neighbor = Current + DIRECTIONS[Dir];
 
-                u8 GenTileType = GeneratedMap[XYToIdx(Neighbor, World->Width)];
-                if (IsPInBounds(Neighbor, World) &&
-                    GenTileType == GEN_TILE_FLOOR ||
-                    GenTileType == GEN_TILE_CORRIDOR)
+                if (IsPInBounds(Neighbor, World))
                 {
-                    FoundRoomGround = true;
-                    break;
+                    u8 GenTileType = GeneratedMap[XYToIdx(Neighbor, World->Width)];
+                    if (GenTileType == GEN_TILE_FLOOR || GenTileType == GEN_TILE_CORRIDOR)
+                    {
+                        FoundRoomGround = true;
+                        break;
+                    }
                 }
             }
 
@@ -534,7 +535,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
                     int Attempts;
                     for (Statues = 0, Attempts = 0; Statues < StatuesMax && Attempts < AttemptsMax; Attempts++)
                     {
-                        vec2i P = GetRandomRoomP(Room);
+                        vec2i P = GetRandomRoomP(Room, 1);
                         u8 *GenTileType = GeneratedMap + XYToIdx(P, World->Width);
                         if (*GenTileType == GEN_TILE_FLOOR)
                         {
@@ -815,6 +816,9 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     {
         room *Room = GeneratedRooms;
         int MaxAttempts = 100;
+        World->SwarmCount = 1;
+        int AddedToSwarm = 0;
+        int MaxInSwarm = 7;
         for (int i = 0; i < RoomCount; i++, Room++)
         {
             if (Room->Type == ROOM_LARGE)
@@ -832,13 +836,21 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
                         vec2i P = Vec2I(X, Y);
                         if (!CheckCollisions(World, P).Collided)
                         {
+                            AetherFly.SwarmID = World->SwarmCount;
                             AddEntity(World, P, &AetherFly);
                             EnemyCount++;
+                            AddedToSwarm++;
+                            if (AddedToSwarm >= 7)
+                            {
+                                World->SwarmCount++;
+                                AddedToSwarm = 0;
+                            }
                         }
                         Attempt++;
                     }
                 }
             }
+
         }
     }
 #endif
@@ -951,12 +963,23 @@ IsInOpenSet(path_state *PathState, int Idx)
     return false;
 }
 
+// static_g int CalculatePathCalls = 0;
+// static_g int OpenSetMax = 0;
+
+// void ResetPathCallCount() { CalculatePathCalls = 0; OpenSetMax = 0; }
+// int GetPathCallCount() { return CalculatePathCalls; }
+// int GetPathOpenSetMax() { return OpenSetMax; }
+
 void
 AddToOpenSet(path_state *PathState, int Idx)
 {
     if (!IsInOpenSet(PathState, Idx))
     {
         PathState->OpenSet[PathState->OpenSetCount++] = Idx;
+        // if (PathState->OpenSetCount > OpenSetMax)
+        // {
+        //     OpenSetMax = PathState->OpenSetCount;
+        // }
     }
 }
 
@@ -981,8 +1004,10 @@ GetNeighbors(vec2i Pos, world *World,
 }
 
 path_result
-CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memory_arena *ResultArena,  int VizGenMax)
+CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memory_arena *ResultArena, int VizGenMax, b32 IgnoreNPCs = false)
 {
+    // CalculatePathCalls++;
+    
     int VizGen = 0;
     path_result Result = {};
 
@@ -1055,7 +1080,7 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
                 // from another currentIdx position.
                 // In addition, if a cell has already been discovered with a higher GScore, we know that there was no collision,
                 // but this is gonna check collisions for that cell again.
-                b32 Collided = (NeighborIdx == EndIdx) ? false : CheckCollisions(World, Neighbor).Collided;
+                b32 Collided = (NeighborIdx == EndIdx) ? false : CheckCollisions(World, Neighbor, IgnoreNPCs).Collided;
                 if (!Collided)
                 {
                     PathState.CameFrom[NeighborIdx] = CurrentIdx;
@@ -1297,7 +1322,7 @@ IsInLineOfSight(world *World, vec2i Start, vec2i End, int MaxRange)
             }
         }
     }
-
+    
     return false;
 }
 
@@ -1571,7 +1596,7 @@ EntityAttacksWall(entity *Entity, entity *Wall, world *World)
 }
 
 b32
-ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World)
+ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World, b32 ShouldAttack)
 {
     switch(ActiveEntity->Type)
     {
@@ -1583,13 +1608,21 @@ ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World
                 case ENTITY_PLAYER:
                 case ENTITY_NPC:
                 {
-                    EntityAttacksEntity(ActiveEntity, PassiveEntity, World);
-                    return true;
+                    if (ShouldAttack)
+                    {
+                        EntityAttacksEntity(ActiveEntity, PassiveEntity, World);
+                        return true;
+                    }
+                    return false;
                 } break;
 
                 case ENTITY_WALL:
                 {
-                    return EntityAttacksWall(ActiveEntity, PassiveEntity, World);
+                    if (ShouldAttack)
+                    {
+                        return EntityAttacksWall(ActiveEntity, PassiveEntity, World);
+                    }
+                    return false;
                 } break;
 
                 default: break;
@@ -1603,7 +1636,7 @@ ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World
 }
 
 b32
-MoveEntity(world *World, entity *Entity, vec2i NewP, b32 *Out_TurnUsed)
+MoveEntity(world *World, entity *Entity, vec2i NewP, b32 ShouldAttack, b32 *Out_TurnUsed)
 {
     *Out_TurnUsed = false;
     
@@ -1615,7 +1648,7 @@ MoveEntity(world *World, entity *Entity, vec2i NewP, b32 *Out_TurnUsed)
     {
         if (Col.Entity)
         {
-            *Out_TurnUsed = ResolveEntityCollision(Entity, Col.Entity, World);
+            *Out_TurnUsed = ResolveEntityCollision(Entity, Col.Entity, World, ShouldAttack);
         }
 
         return false;
@@ -1670,6 +1703,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                     Entity->Target = World->PlayerEntity->Pos;
                 }
 
+                Entity->SearchTurns = 10;
                 Entity->NpcState = NPC_STATE_SEARCHING;
                 LogEntityAction(Entity, World, "%s (%d): player is missing. Searching where last seen: (%d, %d)", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
             }
@@ -1691,6 +1725,14 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             {
                 Entity->NpcState = NPC_STATE_IDLE;
                 LogEntityAction(Entity, World, "%s (%d): no player in last known location. Now idle", Entity->Name, Entity->DebugID);
+            }
+            else if (Entity->SearchTurns <= 0)
+            {
+                Entity->NpcState = NPC_STATE_IDLE;
+            }
+            else
+            {
+                Entity->SearchTurns--;
             }
         } break;
 
@@ -1729,50 +1771,97 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
                     default: break;
                 }
 
+                int ShouldAttack = GetRandomValue(0, 2);
+                
                 b32 TurnUsed;
-                MoveEntity(GameState->World, Entity, NewEntityP, &TurnUsed);
+                MoveEntity(GameState->World, Entity, NewEntityP, ShouldAttack, &TurnUsed);
             }
         } break;
 
         case NPC_STATE_HUNTING:
         {
             Entity->Target = World->PlayerEntity->Pos;
+
+            if (Entity->SwarmID > 0 && Entity->SwarmID < World->SwarmCount && World->Swarms[Entity->SwarmID].Cooldown <= 0)
+            {
+                entity *WorldEntity = World->Entities;
+                for (int i = 0; i < World->EntityUsedCount; i++, WorldEntity++)
+                {
+                    if (WorldEntity->Type != ENTITY_NONE &&
+                        WorldEntity->SwarmID == Entity->SwarmID &&
+                        WorldEntity->NpcState == NPC_STATE_IDLE &&
+                        GetRandomValue(0, 10)  < 8)
+                    {
+                        WorldEntity->SearchTurns = 10;
+                        WorldEntity->NpcState = NPC_STATE_SEARCHING;
+                        WorldEntity->Target = Entity->Target;
+                    }
+                }
+
+                World->Swarms[Entity->SwarmID].Cooldown = 1000;
+            }
+            
+            // NOTE: First check path taking other npcs into account, if path not found, check if there's one when ignoring other npcs
             path_result Path = CalculatePath(World,
                                              Entity->Pos, World->PlayerEntity->Pos,
                                              &GameState->ScratchArenaA, &GameState->ScratchArenaB,
                                              0);
+
+            // NOTE: TOO SLOW :(
+            if (!Path.FoundPath)
+            {
+                Path = CalculatePath(World,
+                                     Entity->Pos, Entity->Target,
+                                     &GameState->ScratchArenaA, &GameState->ScratchArenaB,
+                                     0, true);
+            }
             
             if (Path.FoundPath && Path.Path)
             {
                 vec2i NewEntityP = Path.Path[0];
                 b32 TurnUsed;
-                MoveEntity(GameState->World, Entity, NewEntityP, &TurnUsed);
+                b32 ShouldAttack = NewEntityP == World->PlayerEntity->Pos;
+                MoveEntity(GameState->World, Entity, NewEntityP, ShouldAttack, &TurnUsed);
             }
-            // else
-            // {
-            //     Entity->NpcState = NPC_STATE_IDLE;
-            //     LogEntityAction(Entity, World, "%s (%d): cannot path to player (%d, %d). Now idle", Entity->Name, Entity->DebugID, World->PlayerEntity->Pos.X, World->PlayerEntity->Pos.Y);
-            // }
+            else
+            {
+                Entity->NpcState = NPC_STATE_IDLE;
+                LogEntityAction(Entity, World, "%s (%d): cannot path to player (%d, %d). Now idle", Entity->Name, Entity->DebugID, World->PlayerEntity->Pos.X, World->PlayerEntity->Pos.Y);
+            }
         } break;
 
         case NPC_STATE_SEARCHING:
         {
+            // NOTE: First check path avoiding npcs, if path not found, check if there's one when ignoring other npcs
             path_result Path = CalculatePath(World,
                                              Entity->Pos, Entity->Target,
                                              &GameState->ScratchArenaA, &GameState->ScratchArenaB,
                                              0);
-            
-            if (Path.FoundPath && Path.Path)
+
+            int MaxWillingToGo = 20;
+            if (!Path.FoundPath || Path.PathSteps > MaxWillingToGo)
+            {
+                Path = CalculatePath(World,
+                                     Entity->Pos, Entity->Target,
+                                     &GameState->ScratchArenaA, &GameState->ScratchArenaB,
+                                     0, true);
+            }
+
+            if (Path.FoundPath && Path.PathSteps > MaxWillingToGo)
+            {
+                Entity->NpcState = NPC_STATE_IDLE;
+            }
+            else if (Path.FoundPath && Path.Path)
             {
                 vec2i NewEntityP = Path.Path[0];
                 b32 TurnUsed;
-                MoveEntity(GameState->World, Entity, NewEntityP, &TurnUsed);
+                MoveEntity(GameState->World, Entity, NewEntityP, false, &TurnUsed);
             }
-            // else
-            // {
-            //     Entity->NpcState = NPC_STATE_IDLE;
-            //     LogEntityAction(Entity, World, "%s (%d): cannot path to target (%d, %d). Now idle", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
-            // }
+            else
+            {
+                Entity->NpcState = NPC_STATE_IDLE;
+                LogEntityAction(Entity, World, "%s (%d): cannot path to target (%d, %d). Now idle", Entity->Name, Entity->DebugID, Entity->Target.X, Entity->Target.Y);
+            }
         } break;
 
         default:

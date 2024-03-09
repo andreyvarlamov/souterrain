@@ -683,6 +683,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     vec2 MouseWorldPxP = CameraScreenToWorld(&GameState->Camera, MouseP);
     vec2i MouseTileP = GetTilePFromPxP(World, MouseWorldPxP);
 
+    // ResetPathCallCount();
+
     // SECTION: GAME LOGIC UPDATE
     switch (GameState->RunState)
     {
@@ -913,7 +915,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     
                     // NOTE: Move entity can set TurnUsed to false, if that was a non-attack collision
                     vec2i OldP = Player->Pos;
-                    if (FoundPosition && MoveEntity(World, Player, NewP, &TurnUsed))
+                    if (FoundPosition && MoveEntity(World, Player, NewP, true, &TurnUsed))
                     {
                         if (IsPositionInCameraView(OldP, &GameState->Camera, World))
                         {
@@ -989,6 +991,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             entity *ActiveEntity = StartingEntity;
             while (ActiveEntity != World->PlayerEntity)
             {
+
                 if (ActiveEntity->Type == ENTITY_NPC)
                 {
                     UpdateNpcState(GameState, World, ActiveEntity);
@@ -1007,10 +1010,20 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                         ActiveEntity->LastHealTurn = World->TurnsPassed;
                         LogEntityAction(ActiveEntity, World, "%s (%d) regens %d health.", ActiveEntity->Name, ActiveEntity->DebugID, RegenAmount);
                     }
-
                 }
-        
-                World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
+
+                int TurnsAdvanced = EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
+                World->TurnsPassed += TurnsAdvanced;
+                {
+                    swarm *Swarm = World->Swarms;
+                    for (int i = 0; i < World->SwarmCount; i++, Swarm++)
+                    {
+                        if (Swarm->Cooldown > 0)
+                        {
+                            Swarm->Cooldown -= TurnsAdvanced;
+                        }
+                    }
+                }
                 ActiveEntity = EntityTurnQueuePeek(World);
 
                 if (ActiveEntity == StartingEntity)
@@ -1191,6 +1204,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         }
     }
 
+    // TraceLog("%d calculate path calls (open set max: %d).", GetPathCallCount(), GetPathOpenSetMax());
+
     // NOTE: Update player FOV and darkness levels
     if (GameState->PlayerFovDirty)
     {
@@ -1253,7 +1268,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         
         // NOTE: Debug UI
         {
-            DrawString(TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
+            DrawString("60.000 FPS",//TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
                        GameState->TitleFont,
                        GameState->TitleFont->PointSize,
                        10, 10, 0,
@@ -1453,15 +1468,20 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 
                 DrawRect(InspectRect, ColorAlpha(VA_BLACK, 240));
 
+                f32 LineX = 1510.0f;
+                f32 LineY = 10.0f;
+                f32 IncY = 50.0f;
+
                 if (EntityToInspect->Name)
                 {
                     DrawString(TextFormat("%s (%d)", EntityToInspect->Name, EntityToInspect->DebugID),
                                GameState->TitleFont,
                                GameState->TitleFont->PointSize,
-                               1510, 10, 0,
+                               LineX, LineY, 0,
                                VA_WHITE,
                                false, VA_BLACK,
                                &GameState->ScratchArenaA);
+                    LineY += IncY;
                 }
 
                 if (EntityToInspect->MaxHealth > 0)
@@ -1469,34 +1489,65 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     DrawString(TextFormat("HP: %d/%d", EntityToInspect->Health, EntityToInspect->MaxHealth),
                                GameState->TitleFont,
                                GameState->TitleFont->PointSize,
-                               1510, 60, 0,
+                               LineX, LineY, 0,
                                VA_WHITE,
                                false, VA_BLACK,
                                &GameState->ScratchArenaA);
-
+                    LineY += IncY;
+                    
                     DrawString(TextFormat("AC: %d", EntityToInspect->ArmorClass),
                                GameState->TitleFont,
                                GameState->TitleFont->PointSize,
-                               1510, 110, 0,
+                               LineX, LineY, 0,
                                VA_WHITE,
                                false, VA_BLACK,
                                &GameState->ScratchArenaA);
-
-                    // DrawString(TextFormat("Attack: %d", EntityToInspect->AttackModifier),
-                    //            GameState->TitleFont,
-                    //            GameState->TitleFont->PointSize,
-                    //            1510, 160, 0,
-                    //            VA_BLACK,
-                    //            false, VA_BLACK,
-                    //            &GameState->ScratchArenaA);
-
+                    LineY += IncY;
+                    
                     DrawString(TextFormat("Damage: 1d%d", EntityToInspect->Damage),
                                GameState->TitleFont,
                                GameState->TitleFont->PointSize,
-                               1510, 210, 0,
+                               LineX, LineY, 0,
                                VA_WHITE,
                                false, VA_BLACK,
                                &GameState->ScratchArenaA);
+                    LineY += IncY;
+                }
+
+                if (EntityToInspect->Type == ENTITY_NPC)
+                {
+                    const char *Action;
+                    switch (EntityToInspect->NpcState)
+                    {
+                        case NPC_STATE_IDLE:
+                        {
+                            Action = "Idle";
+                        } break;
+                        
+                        case NPC_STATE_HUNTING:
+                        {
+                            Action = "Hunting";
+                        } break;
+                        
+                        case NPC_STATE_SEARCHING:
+                        {
+                            Action = "Searching";
+                        } break;
+
+                        default:
+                        {
+                            Action = "Unknown";
+                        } break;
+                    }
+
+                    DrawString(TextFormat("Action: %s", Action),
+                               GameState->TitleFont,
+                               GameState->TitleFont->PointSize,
+                               LineX, LineY, 0,
+                               VA_WHITE,
+                               false, VA_BLACK,
+                               &GameState->ScratchArenaA);
+                    LineY += IncY;
                 }
             
                 if (EntityToInspect->Description)
@@ -1504,7 +1555,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     DrawString(EntityToInspect->Description,
                                GameState->BodyFont,
                                GameState->BodyFont->PointSize,
-                               1510, 260, 400,
+                               LineX, LineY, 400,
                                VA_WHITE,
                                false, VA_BLACK,
                                &GameState->ScratchArenaA);
