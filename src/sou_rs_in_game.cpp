@@ -10,11 +10,11 @@ RunState_InGame(game_state *GameState)
 
     if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
     if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
-    if (KeyPressed(SDL_SCANCODE_F1))
-    {
-        GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
-        ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
-    }
+    // if (KeyPressed(SDL_SCANCODE_F1))
+    // {
+    //     GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
+    //     ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
+    // }
     
     run_state NewRunState = RUN_STATE_IN_GAME;
     

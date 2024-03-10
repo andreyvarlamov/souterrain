@@ -308,10 +308,10 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
 {
     static_i b32 WillDrawRoomGround = false;
 
-    if (KeyPressed(SDL_SCANCODE_G))
-    {
-        WillDrawRoomGround = !WillDrawRoomGround;
-    }
+    // if (KeyPressed(SDL_SCANCODE_G))
+    // {
+    //     WillDrawRoomGround = !WillDrawRoomGround;
+    // }
     
     BeginShaderMode(GameState->Glyph3DShader); BeginDraw();
     {
@@ -428,38 +428,41 @@ DrawGame(game_state *GameState, world *World)
 void
 DrawDebugUI(game_state *GameState, vec2i MouseTileP)
 {
-    world *World = GameState->World;
-    DrawString(TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
-               GameState->TitleFont,
-               GameState->TitleFont->PointSize,
-               10, 10, 0,
-               VA_MAROON,
-               true, ColorAlpha(VA_BLACK, 128),
-               &GameState->ScratchArenaA);
+    if (GameState->ShowDebugUI)
+    {
+        world *World = GameState->World;
+        DrawString(TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
+                   GameState->TitleFont,
+                   GameState->TitleFont->PointSize,
+                   10, 10, 0,
+                   VA_MAROON,
+                   true, ColorAlpha(VA_BLACK, 128),
+                   &GameState->ScratchArenaA);
 
-    DrawString(TextFormat("Tile: %d, %d", MouseTileP.X, MouseTileP.Y, GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
-               GameState->TitleFont,
-               GameState->TitleFont->PointSize,
-               10, 60, 0,
-               VA_MAROON,
-               true, ColorAlpha(VA_BLACK, 128),
-               &GameState->ScratchArenaA);
+        DrawString(TextFormat("Tile: %d, %d", MouseTileP.X, MouseTileP.Y, GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
+                   GameState->TitleFont,
+                   GameState->TitleFont->PointSize,
+                   10, 60, 0,
+                   VA_MAROON,
+                   true, ColorAlpha(VA_BLACK, 128),
+                   &GameState->ScratchArenaA);
 
-    DrawString(TextFormat("Darkness Level: %d", GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
-               GameState->TitleFont,
-               GameState->TitleFont->PointSize,
-               10, 110, 0,
-               VA_MAROON,
-               true, ColorAlpha(VA_BLACK, 128),
-               &GameState->ScratchArenaA);
+        DrawString(TextFormat("Darkness Level: %d", GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
+                   GameState->TitleFont,
+                   GameState->TitleFont->PointSize,
+                   10, 110, 0,
+                   VA_MAROON,
+                   true, ColorAlpha(VA_BLACK, 128),
+                   &GameState->ScratchArenaA);
 
-    DrawString(TextFormat("Turn: %lld", World->CurrentTurn),
-               GameState->TitleFont,
-               GameState->TitleFont->PointSize,
-               10, 160, 0,
-               VA_MAROON,
-               true, ColorAlpha(VA_BLACK, 128),
-               &GameState->ScratchArenaA);
+        DrawString(TextFormat("Turn: %lld", World->CurrentTurn),
+                   GameState->TitleFont,
+                   GameState->TitleFont->PointSize,
+                   10, 160, 0,
+                   VA_MAROON,
+                   true, ColorAlpha(VA_BLACK, 128),
+                   &GameState->ScratchArenaA);
+    }
 }
 
 void
@@ -651,7 +654,7 @@ ProcessPlayerInputs(req_action *Action)
     else if (KeyPressedOrRepeat(SDL_SCANCODE_C)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1,  1); }
     else if (KeyPressedOrRepeat(SDL_SCANCODE_S)) Action->T = ACTION_SKIP_TURN;
     else if (KeyPressed(SDL_SCANCODE_R)) Action->T = ACTION_DROP_ALL_ITEMS;
-    else if (KeyPressed(SDL_SCANCODE_T)) Action->T = ACTION_TELEPORT;
+    // else if (KeyPressed(SDL_SCANCODE_T)) Action->T = ACTION_TELEPORT;
     else if (KeyPressed(SDL_SCANCODE_I)) Action->T = ACTION_OPEN_INVENTORY;
     else if (KeyPressed(SDL_SCANCODE_G)) Action->T = ACTION_OPEN_PICKUP;
     else if (KeyPressed(SDL_SCANCODE_PERIOD) && (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT))) Action->T = ACTION_NEXT_LEVEL;
@@ -899,6 +902,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     game_input *GameInput = &GameState->GameInput;
     ProcessInputs(GameState);
     if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
+    if (KeyPressed(SDL_SCANCODE_F2)) GameState->ShowDebugUI = !GameState->ShowDebugUI;
 
     // SECTION: GAME LOGIC UPDATE
     ClearBuffers(GameState);

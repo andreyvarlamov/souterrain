@@ -453,6 +453,7 @@ struct game_state
     world *OtherWorlds[MAX_WORLDS];
 
     b32 IgnoreFieldOfView;
+    b32 ShowDebugUI;
     
     game_input GameInput;
     req_action PlayerReqAction;
