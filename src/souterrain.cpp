@@ -580,66 +580,6 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
 }
 
 void
-DrawPickupUI(game_state *GameState)
-{
-    world *World = GameState->World;
-    entity *Player = World->PlayerEntity;
-    f32 InventoryWidth = 500.0f;
-    f32 InventoryHeight = 900.0f;
-    rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
-                              GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
-                              InventoryWidth,
-                              InventoryHeight);
-    DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
-
-    f32 LineX = InventoryRect.X + 10.0f;
-    f32 LineY = InventoryRect.Y + 10.0f;
-            
-    entity *ItemPickup = GetEntitiesAt(Player->Pos, World);
-    while (ItemPickup)
-    {
-        if (ItemPickup->Type == ENTITY_ITEM_PICKUP)
-        {
-            item *ItemFromPickup = ItemPickup->Inventory;
-            for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromPickup++)
-            {
-                if (ItemFromPickup->ItemType != ITEM_NONE)
-                {
-                    int ButtonPressed = GuiButtonRect(Rect(LineX, LineY, InventoryWidth - 20.0f, 40.0f));
-                    switch (ButtonPressed)
-                    {
-                        case SDL_BUTTON_LEFT:
-                        {
-                            SetItemToInspect(&GameState->InspectState, ItemFromPickup, ItemPickup, INSPECT_ITEM_TO_PICKUP);
-                        } break;
-
-                        case SDL_BUTTON_RIGHT:
-                        {
-                            GameState->PlayerRequestedPickupItem = ItemFromPickup;
-                            GameState->PlayerRequestedPickupItemItemPickup = ItemPickup;
-                        } break;
-
-                        default: break;
-                    }
-
-                    DrawString(TextFormat("%s", ItemFromPickup->Name),
-                               GameState->BodyFont,
-                               GameState->BodyFont->PointSize,
-                               LineX, LineY, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-
-                    LineY += 40.0f;
-                }
-            }
-        }
-
-        ItemPickup = ItemPickup->Next;
-    }
-}
-
-void
 DrawLevelupUISection(const char *Label, sav_font *Font, f32 FontSize,
                      rect Section, memory_arena *ScratchArena)
 {
@@ -1076,6 +1016,7 @@ ProcessMinedWalls(world *World)
 }
 
 #include "sou_rs_inventory.cpp"
+#include "sou_rs_pickup.cpp"
 
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
@@ -1359,74 +1300,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_PICKUP_MENU:
         {
-            if (KeyPressed(SDL_SCANCODE_I))
-            {
-                ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_INVENTORY_MENU;
-            }
-            
-            if (KeyPressed(SDL_SCANCODE_ESCAPE))
-            {
-                ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_IN_GAME;
-            }
-
-            if (KeyPressed(SDL_SCANCODE_G))
-            {
-                entity *ItemPickup = GetEntitiesAt(Player->Pos, World);
-                while (ItemPickup)
-                {
-                    if (ItemPickup->Type == ENTITY_ITEM_PICKUP)
-                    {
-                        item *ItemFromPickup = ItemPickup->Inventory;
-                        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromPickup++)
-                        {
-                            if (ItemFromPickup->ItemType != ITEM_NONE)
-                            {
-                                if (AddItemToEntityInventory(ItemFromPickup, Player))
-                                {
-                                    // TODO: This is kind of a waste
-                                    RemoveItemFromEntityInventory(ItemFromPickup, ItemPickup);
-                                }
-                            }
-                        }
-
-                        RefreshItemPickupState(ItemPickup);
-                    } 
-                        
-                    ItemPickup = ItemPickup->Next;
-                }
-
-                ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_IN_GAME;
-            }
-
-            if (GameState->PlayerRequestedPickupItem && GameState->PlayerRequestedPickupItem->ItemType != ITEM_NONE)
-            {
-                Assert(GameState->PlayerRequestedPickupItemItemPickup != NULL && GameState->PlayerRequestedPickupItemItemPickup->Type != ENTITY_NONE);
-
-                if (AddItemToEntityInventory(GameState->PlayerRequestedPickupItem, Player))
-                {
-                    RemoveItemFromEntityInventory(GameState->PlayerRequestedPickupItem, GameState->PlayerRequestedPickupItemItemPickup);
-                }
-
-                RefreshItemPickupState(GameState->PlayerRequestedPickupItemItemPickup);
-                
-                ResetInspectMenu(&GameState->InspectState);
-                
-                GameState->PlayerRequestedPickupItem = NULL;
-                GameState->PlayerRequestedPickupItemItemPickup = NULL;
-                DeleteDeadEntities(World);
-            }
-
-            DrawGame(GameState, World);
-
-            BeginUIDraw(GameState);
-            DrawDebugUI(GameState, Vec2I(0, 0));
-            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
-            DrawPickupUI(GameState);
-            DrawInspectUI(GameState);
-            EndUIDraw();
+            GameState->RunState = RunState_PickupMenu(GameState);
         } break;
 
         case RUN_STATE_RANGED_ATTACK:

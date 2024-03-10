@@ -2149,53 +2149,6 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
             TurnUsed = true;
         } break;
 
-        case ACTION_DROP_ALL_ITEMS:
-        {
-            if (Player->Inventory)
-            {
-                entity ItemPickupTestTemplate = {};
-                ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
-                Assert(ItemPickup->Inventory);
-
-                item *ItemFromInventory = Player->Inventory;
-                for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromInventory++)
-                {
-                    if (ItemFromInventory->ItemType > ITEM_NONE)
-                    {
-                        if (AddItemToEntityInventory(ItemFromInventory, ItemPickup))
-                        {
-                            RemoveItemFromEntityInventory(ItemFromInventory, Player);
-                            TurnUsed = true;
-                        }
-                    }
-                }
-
-                RefreshItemPickupState(ItemPickup);
-            }
-        } break;
-
-        case ACTION_OPEN_INVENTORY:
-        {
-            ResetInspectMenu(&GameState->InspectState);
-            GameState->RunState = RUN_STATE_INVENTORY_MENU;
-        } break;
-
-        case ACTION_OPEN_PICKUP:
-        {
-            if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_ITEM_PICKUP, World) != NULL)
-            {
-                ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_PICKUP_MENU;
-            }
-        } break;
-
-        case ACTION_OPEN_RANGED_ATTACK:
-        {
-            ResetInspectMenu(&GameState->InspectState);
-            GameState->RunState = RUN_STATE_RANGED_ATTACK;
-        } break;
-
         case ACTION_NEXT_LEVEL:
         {
             if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_STAIR_DOWN, World))
@@ -2228,6 +2181,53 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
             }
         } break;
 
+        case ACTION_OPEN_INVENTORY:
+        {
+            ResetInspectMenu(&GameState->InspectState);
+            GameState->RunState = RUN_STATE_INVENTORY_MENU;
+        } break;
+
+        case ACTION_OPEN_PICKUP:
+        {
+            if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_ITEM_PICKUP, World) != NULL)
+            {
+                ResetInspectMenu(&GameState->InspectState);
+                GameState->RunState = RUN_STATE_PICKUP_MENU;
+            }
+        } break;
+
+        case ACTION_OPEN_RANGED_ATTACK:
+        {
+            ResetInspectMenu(&GameState->InspectState);
+            GameState->RunState = RUN_STATE_RANGED_ATTACK;
+        } break;
+
+        case ACTION_DROP_ALL_ITEMS:
+        {
+            if (Player->Inventory)
+            {
+                entity ItemPickupTestTemplate = {};
+                ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
+                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
+                Assert(ItemPickup->Inventory);
+
+                item *ItemFromInventory = Player->Inventory;
+                for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromInventory++)
+                {
+                    if (ItemFromInventory->ItemType > ITEM_NONE)
+                    {
+                        if (AddItemToEntityInventory(ItemFromInventory, ItemPickup))
+                        {
+                            RemoveItemFromEntityInventory(ItemFromInventory, Player);
+                            TurnUsed = true;
+                        }
+                    }
+                }
+
+                RefreshItemPickupState(ItemPickup);
+            }
+        } break;
+
         case ACTION_DROP_ITEMS:
         {
             entity ItemPickupTestTemplate = {};
@@ -2242,14 +2242,57 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
                 if (AddItemToEntityInventory(DropItems->Items[ItemI], ItemPickup))
                 {
                     RemoveItemFromEntityInventory(DropItems->Items[ItemI], Player);
+                    TurnUsed = true;
                 }
             }
 
-            ResetInspectMenu(&GameState->InspectState);
+            // ResetInspectMenu(&GameState->InspectState);
 
             RefreshItemPickupState(ItemPickup);
+        } break;
 
-            TurnUsed = true;
+        case ACTION_PICKUP_ALL_ITEMS:
+        {
+            entity *ItemPickup = GetEntitiesAt(Player->Pos, World);
+            while (ItemPickup)
+            {
+                if (ItemPickup->Type == ENTITY_ITEM_PICKUP)
+                {
+                    item *ItemFromPickup = ItemPickup->Inventory;
+                    for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromPickup++)
+                    {
+                        if (ItemFromPickup->ItemType != ITEM_NONE)
+                        {
+                            if (AddItemToEntityInventory(ItemFromPickup, Player))
+                            {
+                                RemoveItemFromEntityInventory(ItemFromPickup, ItemPickup);
+                                TurnUsed = true;
+                            }
+                        }
+                    }
+
+                    RefreshItemPickupState(ItemPickup);
+                } 
+                        
+                ItemPickup = ItemPickup->Next;
+            }
+        } break;
+
+        case ACTION_PICKUP_ITEMS:
+        {
+            req_action_pickup_items *PickupItems = &Action->PickupItems;
+            
+            for (int ItemI = 0; ItemI < PickupItems->ItemCount; ItemI++)
+            {
+                if (AddItemToEntityInventory(PickupItems->Items[ItemI], Player))
+                {
+                    RemoveItemFromEntityInventory(PickupItems->Items[ItemI], PickupItems->ItemPickups[ItemI]);
+                    RefreshItemPickupState(PickupItems->ItemPickups[ItemI]);
+                    TurnUsed = true;
+                }
+            }
+                
+            // ResetInspectMenu(&GameState->InspectState);
         } break;
     }
 

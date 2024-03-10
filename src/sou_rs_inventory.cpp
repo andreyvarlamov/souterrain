@@ -8,13 +8,6 @@ RunState_InventoryMenu(game_state *GameState)
     entity *Player = World->PlayerEntity;
     game_input *GameInput = &GameState->GameInput;
     
-    if (KeyPressed(SDL_SCANCODE_I) || KeyPressed(SDL_SCANCODE_ESCAPE))
-    {
-        ResetInspectMenu(&GameState->InspectState);
-        memset(GameState->InventorySkipSlot, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(b32));
-        return RUN_STATE_IN_GAME;
-    }
-
     DrawGame(GameState, World);
 
     BeginUIDraw(GameState);
@@ -29,13 +22,13 @@ RunState_InventoryMenu(game_state *GameState)
                               InventoryHeight);
     DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
 
-    item *InventoryItem = Player->Inventory;
     f32 LineX = InventoryRect.X + 10.0f;
     f32 LineY = InventoryRect.Y + 10.0f;
 
     req_action *Action = &GameState->PlayerReqAction;
     req_action_drop_items *DropItems = &Action->DropItems;
     
+    item *InventoryItem = Player->Inventory;
     for (int SlotI = 0; SlotI < INVENTORY_SLOTS_PER_ENTITY; SlotI++, InventoryItem++)
     {
         if (InventoryItem->ItemType != ITEM_NONE && !GameState->InventorySkipSlot[SlotI])
@@ -73,6 +66,13 @@ RunState_InventoryMenu(game_state *GameState)
     DrawInspectUI(GameState);
             
     EndUIDraw();
+
+    if (KeyPressed(SDL_SCANCODE_I) || KeyPressed(SDL_SCANCODE_ESCAPE))
+    {
+        ResetInspectMenu(&GameState->InspectState);
+        memset(GameState->InventorySkipSlot, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(b32));
+        return RUN_STATE_IN_GAME;
+    }
 
     return RUN_STATE_INVENTORY_MENU;
 }
