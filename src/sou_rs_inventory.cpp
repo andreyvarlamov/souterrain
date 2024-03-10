@@ -38,7 +38,7 @@ RunState_InventoryMenu(game_state *GameState)
             {
                 case SDL_BUTTON_LEFT:
                 { 
-                    SetItemToInspect(&GameState->InspectState, InventoryItem, NULL, INSPECT_ITEM_TO_DROP);
+                    StartInspectItem(&GameState->InspectState, InventoryItem, Player, SlotI, "DROP");
                 } break;
 
                 case SDL_BUTTON_RIGHT:
@@ -46,6 +46,7 @@ RunState_InventoryMenu(game_state *GameState)
                     Action->T = ACTION_DROP_ITEMS;
                     DropItems->Items[DropItems->ItemCount++] = InventoryItem;
                     GameState->InventorySkipSlot[SlotI] = true;
+                    EndInspect(&GameState->InspectState);
                 } break;
 
                 default: break;
@@ -63,13 +64,34 @@ RunState_InventoryMenu(game_state *GameState)
         }
     }
 
-    DrawInspectUI(GameState);
+    DrawInspectUI(&GameState->InspectState, GameState);
+
+    if (GameState->InspectState.T == INSPECT_ITEM && GameState->InspectState.ButtonClicked)
+    {
+        Action->T = ACTION_DROP_ITEMS;
+        DropItems->Items[DropItems->ItemCount++] = GameState->InspectState.IS_Item.ItemToInspect;
+        GameState->InventorySkipSlot[GameState->InspectState.IS_Item.MenuSlotI] = true;
+        EndInspect(&GameState->InspectState);
+    }
             
     EndUIDraw();
 
-    if (KeyPressed(SDL_SCANCODE_I) || KeyPressed(SDL_SCANCODE_ESCAPE))
+    if (KeyPressed(SDL_SCANCODE_ESCAPE))
     {
-        ResetInspectMenu(&GameState->InspectState);
+        if (GameState->InspectState.T != INSPECT_NONE)
+        {
+            EndInspect(&GameState->InspectState);
+        }
+        else
+        {
+            memset(GameState->InventorySkipSlot, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(b32));
+            return RUN_STATE_IN_GAME;
+        }
+    }
+
+    if (KeyPressed(SDL_SCANCODE_I))
+    {
+        EndInspect(&GameState->InspectState);
         memset(GameState->InventorySkipSlot, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(b32));
         return RUN_STATE_IN_GAME;
     }

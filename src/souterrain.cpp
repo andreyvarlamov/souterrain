@@ -628,212 +628,6 @@ DrawLevelupUI(game_state *GameState)
     Section.X += SectionWidth;
 }
 
-void
-DrawInspectUI(game_state *GameState)
-{
-    world *World = GameState->World;
-    b32 InspectMenuInternalButtonPressed = false;
-    rect InspectRect = Rect(1500, 0, 420, 1080);
-    switch (GameState->InspectState.T)
-    {
-        case INSPECT_ENTITY:
-        {
-            entity *EntityToInspect = GameState->InspectState.IS_Entity.EntityToInspect;
-                
-            DrawRect(InspectRect, ColorAlpha(VA_BLACK, 240));
-
-            f32 LineX = 1510.0f;
-            f32 LineY = 10.0f;
-            f32 IncY = 50.0f;
-
-            if (EntityToInspect->Name)
-            {
-                DrawString(TextFormat("%s (%d)", EntityToInspect->Name, EntityToInspect->DebugID),
-                           GameState->TitleFont,
-                           GameState->TitleFont->PointSize,
-                           LineX, LineY, 0,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-                LineY += IncY;
-            }
-
-            if (EntityToInspect->MaxHealth > 0)
-            {
-                DrawString(TextFormat("HP: %d/%d", EntityToInspect->Health, EntityToInspect->MaxHealth),
-                           GameState->TitleFont,
-                           GameState->TitleFont->PointSize,
-                           LineX, LineY, 0,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-                LineY += IncY;
-                    
-                DrawString(TextFormat("AC: %d", EntityToInspect->ArmorClass),
-                           GameState->TitleFont,
-                           GameState->TitleFont->PointSize,
-                           LineX, LineY, 0,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-                LineY += IncY;
-                    
-                DrawString(TextFormat("Damage: 1d%d", EntityToInspect->Damage),
-                           GameState->TitleFont,
-                           GameState->TitleFont->PointSize,
-                           LineX, LineY, 0,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-                LineY += IncY;
-            }
-
-            if (EntityToInspect->Type == ENTITY_NPC)
-            {
-                const char *Action;
-                switch (EntityToInspect->NpcState)
-                {
-                    case NPC_STATE_IDLE:
-                    {
-                        Action = "Idle";
-                    } break;
-                        
-                    case NPC_STATE_HUNTING:
-                    {
-                        Action = "Hunting";
-                    } break;
-                        
-                    case NPC_STATE_SEARCHING:
-                    {
-                        Action = "Searching";
-                    } break;
-
-                    default:
-                    {
-                        Action = "Unknown";
-                    } break;
-                }
-
-                DrawString(TextFormat("Action: %s", Action),
-                           GameState->TitleFont,
-                           GameState->TitleFont->PointSize,
-                           LineX, LineY, 0,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-                LineY += IncY;
-            }
-            
-            if (EntityToInspect->Description)
-            {
-                DrawString(EntityToInspect->Description,
-                           GameState->BodyFont,
-                           GameState->BodyFont->PointSize,
-                           LineX, LineY, 400,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-            }
-        } break;
-
-        case INSPECT_ITEM_TO_PICKUP:
-        case INSPECT_ITEM_TO_DROP:
-        {
-            item *ItemToInspect = GameState->InspectState.IS_Item.ItemToInspect;
-            entity *ItemPickup = GameState->InspectState.IS_Item.ItemPickup;
-                
-            DrawRect(InspectRect, ColorAlpha(VA_BLACK, 240));
-
-            if (ItemToInspect->Name)
-            {
-                DrawString(TextFormat("%s", ItemToInspect->Name),
-                           GameState->TitleFont,
-                           GameState->TitleFont->PointSize,
-                           1510, 10, 0,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-
-                DrawString(TextFormat("%s", ItemToInspect->Description),
-                           GameState->BodyFont,
-                           GameState->BodyFont->PointSize,
-                           1510, 60, 400,
-                           VA_WHITE,
-                           false, VA_BLACK,
-                           &GameState->ScratchArenaA);
-
-                if (ItemToInspect->HaimaBonus > 0)
-                {
-                    DrawString(TextFormat("Haima Bonus: %d", ItemToInspect->HaimaBonus),
-                               GameState->BodyFont,
-                               GameState->BodyFont->PointSize,
-                               1510, 100, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-                }
-
-                switch (GameState->InspectState.T)
-                {
-                    case INSPECT_ITEM_TO_PICKUP:
-                    {
-                        int ButtonPressed = GuiButtonRect(Rect(1510.0f, 1040.0f, InspectRect.Width - 20.0f, 40.0f));
-                        if (ButtonPressed == SDL_BUTTON_LEFT)
-                        {
-                            GameState->PlayerRequestedPickupItem = ItemToInspect;
-                            GameState->PlayerRequestedPickupItemItemPickup = ItemPickup;
-                            InspectMenuInternalButtonPressed = true;
-                        }
-
-                        DrawString("PICK UP",
-                                   GameState->TitleFont,
-                                   GameState->TitleFont->PointSize,
-                                   1510, 1040, 0,
-                                   VA_WHITE,
-                                   false, VA_BLACK,
-                                   &GameState->ScratchArenaA);
-
-                    } break;
-                        
-                    case INSPECT_ITEM_TO_DROP:
-                    {
-                        int ButtonPressed = GuiButtonRect(Rect(1510.0f, 1040.0f, InspectRect.Width - 20.0f, 40.0f));
-                        if (ButtonPressed == SDL_BUTTON_LEFT)
-                        {
-                            GameState->PlayerRequestedDropItem = ItemToInspect;
-                            InspectMenuInternalButtonPressed = true;
-                        }
-
-                        DrawString("DROP",
-                                   GameState->TitleFont,
-                                   GameState->TitleFont->PointSize,
-                                   1510, 1040, 0,
-                                   VA_WHITE,
-                                   false, VA_BLACK,
-                                   &GameState->ScratchArenaA);
-                    } break;
-
-                    default: break;
-                }
-            }
-        } break;
-
-        default: break;
-    }
-
-    if (GameState->InspectState.T != INSPECT_NONE && !GameState->InspectState.JustOpened && !InspectMenuInternalButtonPressed)
-    {
-        if (MouseReleased(SDL_BUTTON_LEFT) || MouseReleased(SDL_BUTTON_RIGHT) || KeyPressed(SDL_SCANCODE_ESCAPE))
-        {
-            ResetInspectMenu(&GameState->InspectState);
-        }
-    }
-    else if (GameState->InspectState.JustOpened)
-    {
-        GameState->InspectState.JustOpened = false;
-    }
-}
-
 inline void
 BeginUIDraw(game_state *GameState)
 {
@@ -1015,6 +809,8 @@ ProcessMinedWalls(world *World)
     }
 }
 
+#include "sou_inspect_ui.cpp"
+#include "sou_rs_in_game.cpp"
 #include "sou_rs_inventory.cpp"
 #include "sou_rs_pickup.cpp"
 
@@ -1158,28 +954,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     game_input *GameInput = &GameState->GameInput;
     ProcessInputs(GameState);
     if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
-    if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
-    if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
-    if (MouseReleased(SDL_BUTTON_RIGHT))
-    {
-        if (IsInFOV(World, Player->FieldOfView, GameInput->MouseWorldTileP))
-        {
-            entity *EntityToInspect = GetEntitiesAt(GameInput->MouseWorldTileP, World);
-            if (EntityToInspect)
-            {
-                SetEntityToInspect(&GameState->InspectState, EntityToInspect);
-            }
-            else
-            {
-                ResetInspectMenu(&GameState->InspectState);
-            }
-        }
-    }
-    if (KeyPressed(SDL_SCANCODE_F1))
-    {
-        GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
-        ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
-    }
 
     // SECTION: GAME LOGIC UPDATE
     ClearBuffers(GameState);
@@ -1232,65 +1006,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_IN_GAME:
         {
-            i64 StartTurn = World->CurrentTurn;
-            
-            entity *ActiveEntity = EntityTurnQueuePeek(World);
-            if (ActiveEntity == Player)
-            {
-                ProcessPlayerInputs(&GameState->PlayerReqAction);
-                b32 TurnUsed = UpdatePlayer(Player, World, &GameState->Camera, &GameState->PlayerReqAction, GameState);
-                if (TurnUsed)
-                {
-                    World->CurrentTurn += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
-                    EntityRegen(Player, World);
-                    ActiveEntity = EntityTurnQueuePeek(World);
-                    ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
-                }
-                ResetPlayerInputs(&GameState->PlayerReqAction);
-            }
-
-            b32 FirstEntity = true;
-            entity *StartingEntity = ActiveEntity;
-            while (ActiveEntity != Player && (FirstEntity || ActiveEntity != StartingEntity))
-            {
-                switch (ActiveEntity->Type)
-                {
-                    case ENTITY_NPC:
-                    {
-                        b32 TurnUsed = UpdateNpc(GameState, World, ActiveEntity);
-                        if (TurnUsed)
-                        {
-                            World->CurrentTurn += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
-                            EntityRegen(ActiveEntity, World);
-                        }
-                    } break;
-
-                    default:
-                    {
-                        EntityTurnQueuePopWithoutConsumingCost(World);
-                    } break;
-                }
-
-                ActiveEntity = EntityTurnQueuePeek(World);
-
-                FirstEntity = false;
-            }
-
-            i64 TurnsPassed = World->CurrentTurn - StartTurn;
-
-            ProcessSwarms(World, TurnsPassed);
- 
-            ProcessMinedWalls(World);
-
-            DeleteDeadEntities(World);
-
-            DrawGame(GameState, World);
-
-            BeginUIDraw(GameState);
-            DrawDebugUI(GameState, GameInput->MouseWorldTileP);
-            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
-            DrawInspectUI(GameState);
-            EndUIDraw();
+            GameState->RunState = RunState_InGame(GameState);
         } break;
 
         case RUN_STATE_INVENTORY_MENU:
@@ -1332,7 +1048,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             BeginUIDraw(GameState);
             DrawDebugUI(GameState, Vec2I(0, 0));
             DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
-            DrawInspectUI(GameState);
+            DrawInspectUI(&GameState->InspectState, GameState);
             EndUIDraw();
         } break;
 

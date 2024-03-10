@@ -2066,42 +2066,8 @@ RefreshItemPickupState(entity *ItemPickup)
     }
 }
 
-void
-SetItemToInspect(inspect_state *InspectState, item *Item, entity *ItemPickup, inspect_type Type)
-{
-    Assert(Type == INSPECT_ITEM_TO_PICKUP || Type == INSPECT_ITEM_TO_DROP);
-
-    inspect_state NewInspectState = {};
-    NewInspectState.T = Type;
-    NewInspectState.JustOpened = true;
-    NewInspectState.IS_Item.ItemToInspect = Item;
-    NewInspectState.IS_Item.ItemPickup = ItemPickup;
-    
-    *InspectState = NewInspectState;
-}
-
-void
-SetEntityToInspect(inspect_state *InspectState, entity *Entity)
-{
-    inspect_state NewInspectState = {};
-    NewInspectState.T = INSPECT_ENTITY;
-    NewInspectState.JustOpened = true;
-    NewInspectState.IS_Entity.EntityToInspect = Entity;
-        
-    *InspectState = NewInspectState;
-}
-
-void
-ResetInspectMenu(inspect_state *InspectState)
-{
-    inspect_state NewInspectState = {};
-    NewInspectState.T = INSPECT_NONE;
-
-    *InspectState = NewInspectState;
-}
-
 b32
-UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action, game_state *GameState)
+UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action, game_state *GameState, run_state *Out_NewRunState)
 {
     b32 TurnUsed = false;
     if (GameState->EntityToHit)
@@ -2156,7 +2122,7 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
                 if (GameState->CurrentWorld < MAX_WORLDS - 1)
                 {
                     GameState->CurrentWorld++;
-                    GameState->RunState = RUN_STATE_LOAD_WORLD;
+                    *Out_NewRunState = RUN_STATE_LOAD_WORLD;
                 }
                 else
                 {
@@ -2172,7 +2138,7 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
                 if (GameState->CurrentWorld > 0)
                 {
                     GameState->CurrentWorld--;
-                    GameState->RunState = RUN_STATE_LOAD_WORLD;
+                    *Out_NewRunState = RUN_STATE_LOAD_WORLD;
                 }
                 else
                 {
@@ -2183,23 +2149,20 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
 
         case ACTION_OPEN_INVENTORY:
         {
-            ResetInspectMenu(&GameState->InspectState);
-            GameState->RunState = RUN_STATE_INVENTORY_MENU;
+            *Out_NewRunState = RUN_STATE_INVENTORY_MENU;
         } break;
 
         case ACTION_OPEN_PICKUP:
         {
             if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_ITEM_PICKUP, World) != NULL)
             {
-                ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_PICKUP_MENU;
+                *Out_NewRunState = RUN_STATE_PICKUP_MENU;
             }
         } break;
 
         case ACTION_OPEN_RANGED_ATTACK:
         {
-            ResetInspectMenu(&GameState->InspectState);
-            GameState->RunState = RUN_STATE_RANGED_ATTACK;
+            *Out_NewRunState = RUN_STATE_RANGED_ATTACK;
         } break;
 
         case ACTION_DROP_ALL_ITEMS:
@@ -2246,8 +2209,6 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
                 }
             }
 
-            // ResetInspectMenu(&GameState->InspectState);
-
             RefreshItemPickupState(ItemPickup);
         } break;
 
@@ -2291,8 +2252,6 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
                     TurnUsed = true;
                 }
             }
-                
-            // ResetInspectMenu(&GameState->InspectState);
         } break;
     }
 

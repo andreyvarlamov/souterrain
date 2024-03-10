@@ -49,7 +49,7 @@ RunState_PickupMenu(game_state *GameState)
                         {
                             case SDL_BUTTON_LEFT:
                             {
-                                SetItemToInspect(&GameState->InspectState, ItemFromPickup, ItemPickup, INSPECT_ITEM_TO_PICKUP);
+                                StartInspectItem(&GameState->InspectState, ItemFromPickup, ItemPickup, MenuSlotI, "PICK UP");
                             } break;
 
                             case SDL_BUTTON_RIGHT:
@@ -59,6 +59,7 @@ RunState_PickupMenu(game_state *GameState)
                                 PickupItems->ItemPickups[PickupItems->ItemCount] = ItemPickup;
                                 PickupItems->ItemCount++;
                                 GameState->PickupSkipSlot[MenuSlotI] = true;
+                                EndInspect(&GameState->InspectState);
                             } break;
 
                             default: break;
@@ -91,20 +92,43 @@ RunState_PickupMenu(game_state *GameState)
         ItemPickup = ItemPickup->Next;
     }
 
-    DrawInspectUI(GameState);
+    DrawInspectUI(&GameState->InspectState, GameState);
+
+    if (GameState->InspectState.T == INSPECT_ITEM && GameState->InspectState.ButtonClicked)
+    {
+        Action->T = ACTION_PICKUP_ITEMS;
+        PickupItems->Items[PickupItems->ItemCount] = GameState->InspectState.IS_Item.ItemToInspect;
+        PickupItems->ItemPickups[PickupItems->ItemCount] = GameState->InspectState.IS_Item.InventoryEntity;
+        PickupItems->ItemCount++;
+        GameState->PickupSkipSlot[GameState->InspectState.IS_Item.MenuSlotI] = true;
+        EndInspect(&GameState->InspectState);
+    }
     
     EndUIDraw();
 
-    if (KeyPressed(SDL_SCANCODE_I) || KeyPressed(SDL_SCANCODE_ESCAPE))
+    if (KeyPressed(SDL_SCANCODE_ESCAPE))
     {
-        ResetInspectMenu(&GameState->InspectState);
+        if (GameState->InspectState.T != INSPECT_NONE)
+        {
+            EndInspect(&GameState->InspectState);
+        }
+        else
+        {
+            memset(GameState->PickupSkipSlot, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(b32));
+            return RUN_STATE_IN_GAME;
+        }
+    }
+    
+    if (KeyPressed(SDL_SCANCODE_I))
+    {
+        EndInspect(&GameState->InspectState);
         memset(GameState->PickupSkipSlot, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(b32));
         return RUN_STATE_IN_GAME;
     }
 
     if (KeyPressed(SDL_SCANCODE_G))
     {
-        ResetInspectMenu(&GameState->InspectState);
+        EndInspect(&GameState->InspectState);
         GameState->PlayerReqAction.T = ACTION_PICKUP_ALL_ITEMS;
         memset(GameState->PickupSkipSlot, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(b32));
         return RUN_STATE_IN_GAME;

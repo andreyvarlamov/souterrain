@@ -281,8 +281,7 @@ enum inspect_type
 {
     INSPECT_NONE = 0,
     INSPECT_ENTITY,
-    INSPECT_ITEM_TO_PICKUP,
-    INSPECT_ITEM_TO_DROP
+    INSPECT_ITEM
 };
 
 struct inspect_state_entity
@@ -293,7 +292,8 @@ struct inspect_state_entity
 struct inspect_state_item
 {
     item *ItemToInspect;
-    entity *ItemPickup;
+    entity *InventoryEntity;
+    int MenuSlotI;
 };
 
 struct inspect_state
@@ -301,6 +301,8 @@ struct inspect_state
     inspect_type T;
 
     b32 JustOpened;
+    b32 ButtonClicked;
+    const char *ButtonLabel;
 
     union
     {
