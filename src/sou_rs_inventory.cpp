@@ -22,8 +22,22 @@ RunState_InventoryMenu(game_state *GameState)
                               InventoryHeight);
     DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
 
+    const char *Title = "INVENTORY";
+    vec2 TitleDim = GetStringDimensions(Title, GameState->TitleFont, GameState->TitleFont->PointSize);
+
+    f32 TitleX = InventoryRect.X + InventoryWidth * 0.5f - TitleDim.X * 0.5f;
+    f32 TitleY = InventoryRect.Y + 10.0f;
+
+    DrawString(Title,
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               TitleX, TitleY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+
     f32 LineX = InventoryRect.X + 10.0f;
-    f32 LineY = InventoryRect.Y + 10.0f;
+    f32 LineY = TitleY + 50.0f;
 
     req_action *Action = &GameState->PlayerReqAction;
     req_action_drop_items *DropItems = &Action->DropItems;

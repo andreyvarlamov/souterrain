@@ -778,9 +778,8 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     entity Player = Template_Player();
     World->PlayerEntity = AddEntity(World, PlayerP, &Player);
 
-    entity ItemPickupTestTemplate = {};
-    ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-    entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate);
+    entity ItemPickupTemplate = Template_ItemPickup();
+    entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTemplate);
 
     ItemPickupTest->Inventory[0] = Template_HaimaPotion();
     ItemPickupTest->Inventory[1] = Template_ShortBow();
@@ -788,7 +787,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
     
-    ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTestTemplate);
+    ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTemplate);
 
     ItemPickupTest->Inventory[0] = Template_ShoddyPickaxe();
     ItemPickupTest->Inventory[1] = Template_Sword();
@@ -2384,9 +2383,8 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
         {
             if (Player->Inventory)
             {
-                entity ItemPickupTestTemplate = {};
-                ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
+                entity ItemPickupTemplate = Template_ItemPickup();
+                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTemplate);
                 Assert(ItemPickup->Inventory);
 
                 item *ItemFromInventory = Player->Inventory;
@@ -2408,9 +2406,8 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
 
         case ACTION_DROP_ITEMS:
         {
-            entity ItemPickupTestTemplate = {};
-            ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-            entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
+            entity ItemPickupTemplate = Template_ItemPickup();
+            entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTemplate);
             Assert(ItemPickup->Inventory);
 
             req_action_drop_items *DropItems = &Action->DropItems;

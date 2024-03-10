@@ -90,7 +90,7 @@ Template_StairsUp()
     Template.Color = VA_ORANGE;
     Template.Glyph = '<';
     Template.Name = "Stairs Up";
-    Template.Description = "Press < to go to the higher level of Souterrain.";
+    Template.Description = "Walk over and press < to go to the higher level of Souterrain.";
 
     return Template;
 }
@@ -108,7 +108,23 @@ Template_StairsDown()
     Template.Color = VA_ORANGE;
     Template.Glyph = '>';
     Template.Name = "Stairs Down";
-    Template.Description = "Press > to go to the lower level of Souterrain.";
+    Template.Description = "Walk over and press > to go to the lower level of Souterrain.";
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_ItemPickup()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+
+    Template.Type = ENTITY_ITEM_PICKUP;
+    Template.Name = "Item pickup";
+    Template.Description = "Walk over the tile and press G to view items.";
 
     return Template;
 }
