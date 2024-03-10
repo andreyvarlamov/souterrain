@@ -276,8 +276,8 @@ InitWindow(const char *WindowName, int WindowWidth, int WindowHeight)
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         SdlState->Window = SDL_CreateWindow(WindowName,
-                                            // 3160, 40,
-                                            40, 40, //SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                            3160, 40,
+                                            // 40, 40, //SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                             WindowWidth, WindowHeight,
                                             SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
@@ -1723,6 +1723,34 @@ SavLoadFont(memory_arena *Arena, const char *Path, u32 PointSize)
     TTF_CloseFont(SdlFont);
     
     return Font;
+}
+
+vec2
+GetStringDimensions(const char *String,
+                    sav_font *Font, f32 PointSize)
+{
+    f32 SizeRatio = PointSize / Font->PointSize;
+    f32 LineHeight = SizeRatio * Font->Height;
+    
+    f32 Width = 0.0f;
+    f32 Height = LineHeight;
+    
+    for (int StringI = 0;
+         String[StringI] != '\0';
+         ++StringI)
+    {
+        char Glyph = String[StringI];
+        if (Glyph == '\n')
+        {
+            Height += LineHeight;
+        }
+        else
+        {
+            Width += SizeRatio * Font->GlyphInfos[Glyph].Advance;
+        }
+    }
+
+    return Vec2(Width, Height);
 }
 
 void

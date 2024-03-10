@@ -243,6 +243,10 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity)
     {
         Entity->Health = Entity->MaxHealth = ENTITY_HEALTH_DEFAULT;
     }
+    if (Entity->Level == 0)
+    {
+        Entity->Level = 1;
+    }
 
     AddEntityToSpatial(World, Pos, Entity);
 
@@ -1533,6 +1537,29 @@ EntityTurnQueueDelete(world *World, entity *Entity)
 }
 
 // SECTION: ENTITY BEHAVIOR
+enum { FIRST_LEVEL_XP_GAIN = 50 };
+
+int
+GetXPNeededForLevel(int Level)
+{
+    int XPNeeded = 50;
+    for (int i = 1; i < Level; i++)
+    {
+        XPNeeded *= 2;
+    }
+    return XPNeeded;
+}
+
+void
+EntityXPGain(entity *Entity, int XP)
+{
+    Entity->XP += XP;
+    if (Entity->XP >= GetXPNeededForLevel(Entity->Level + 1))
+    {
+        Entity->Level++;
+    }
+}
+
 void
 EntityAttacksEntity(entity *Attacker, entity *Defender, world *World)
 {
@@ -1556,6 +1583,11 @@ EntityAttacksEntity(entity *Attacker, entity *Defender, world *World)
         }
         else
         {
+            if (Attacker == World->PlayerEntity)
+            {
+                EntityXPGain(Attacker, Defender->XPGain);
+            }
+            
             LogEntityAction(Attacker, World,
                             "%s (%d) hits %s (%d) for %d damage (%d + %d > %d), killing them.",
                             Attacker->Name, Attacker->DebugID,

@@ -215,6 +215,7 @@ SAV_API void BeginTextureMode(sav_render_texture RenderTexture, rect RenderTextu
 SAV_API void EndTextureMode();
 
 SAV_API sav_font *SavLoadFont(memory_arena *Arena, const char *Path, u32 PointSize);
+SAV_API vec2 GetStringDimensions(const char *String, sav_font *Font, f32 PointSize);
 SAV_API void DrawString(const char *String, sav_font *Font, f32 PointSize, f32 X, f32 Y, f32 MaxWidth, color Color, b32 DrawBg, color BgColor, memory_arena *TransientArena);
 
 SAV_API b32 GuiButtonRect(rect R);

@@ -133,7 +133,7 @@ Template_Player()
     Template.Description = "After Derval's disappearance you awake in the Souterrain. You've read about this place in the dusty tomes kept in St Catherine's Library. You remember one thing: the only way is down.";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
 
-    Template.Haima = 20000;
+    Template.Haima = 17;
     Template.Kitrina = 9;
     Template.Melana = 5;
     Template.Sera = 3;
@@ -180,6 +180,8 @@ Template_AetherFly()
 
     Template.RegenActionCost = 1500;
     Template.RegenAmount = 1;
+
+    Template.XPGain = 10;
     
     return Template;
 }

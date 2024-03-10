@@ -540,6 +540,524 @@ ResetInspectMenu(inspect_state *InspectState)
     *InspectState = NewInspectState;
 }
 
+void
+DrawDebugUI(game_state *GameState, vec2i MouseTileP)
+{
+    world *World = GameState->World;
+    DrawString(TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               10, 10, 0,
+               VA_MAROON,
+               true, ColorAlpha(VA_BLACK, 128),
+               &GameState->ScratchArenaA);
+
+    DrawString(TextFormat("Tile: %d, %d", MouseTileP.X, MouseTileP.Y, GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               10, 60, 0,
+               VA_MAROON,
+               true, ColorAlpha(VA_BLACK, 128),
+               &GameState->ScratchArenaA);
+
+    DrawString(TextFormat("Darkness Level: %d", GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               10, 110, 0,
+               VA_MAROON,
+               true, ColorAlpha(VA_BLACK, 128),
+               &GameState->ScratchArenaA);
+
+    DrawString(TextFormat("Turn: %lld", World->TurnsPassed),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               10, 160, 0,
+               VA_MAROON,
+               true, ColorAlpha(VA_BLACK, 128),
+               &GameState->ScratchArenaA);
+}
+
+void
+DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
+{
+    world *World = GameState->World;
+    rect PlayerStatsRect = Rect(0, 780, 600, 300);
+    DrawRect(PlayerStatsRect, ColorAlpha(VA_BLACK, 240));
+
+    f32 PaddingX = 20.0f;
+    f32 PaddingY = 20.0f;
+
+    f32 TopY = PlayerStatsRect.Y + PaddingY;
+    f32 LineX = PlayerStatsRect.X + PaddingX;
+    f32 LineY = TopY;
+
+    color PortraitColor = (((f32) Player->Health / (f32) Player->MaxHealth > 0.3f) ? VA_WHITE : Color(0xAE4642FF));
+
+    f32 PortraitWidth = 160.0f;
+    f32 PortraitHeight = 160.0f;
+    f32 PortraitX = LineX;
+    f32 PortraitY = PlayerStatsRect.Y + PlayerStatsRect.Height * 0.5f - PortraitHeight * 0.5f;
+
+    DrawTexture(GameState->PlayerPortraitTex, Rect(PortraitX, PortraitY, PortraitWidth, PortraitHeight), PortraitColor);
+    if (Player->Health > 0)
+    {
+        vec2 PlayerPxP = Vec2(Player->Pos.X * World->TilePxW + World->TilePxW * 0.5f,
+                              Player->Pos.Y * World->TilePxH + World->TilePxH * 0.5f);
+        vec2 EyesOffset = MouseWorldPxP - PlayerPxP;
+        f32 MaxAwayFromPlayer = 200.0f;
+        EyesOffset = (VecLengthSq(EyesOffset) > Square(MaxAwayFromPlayer) ?
+                      VecNormalize(EyesOffset) * MaxAwayFromPlayer :
+                      EyesOffset);
+        EyesOffset *= 0.05f;
+        DrawTexture(GameState->PlayerPortraitEyesTex, Rect(PortraitX + EyesOffset.X, PortraitY, PortraitWidth, PortraitHeight), PortraitColor);
+    }
+
+    LineX += PortraitWidth + PaddingX;
+
+    f32 LineHeight = 37.0f;
+    f32 MaxWidth = 180.0f;
+
+    DrawString(TextFormat("Level: %d", Player->Level),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("HP: %d/%d", Player->Health, Player->MaxHealth),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+            
+    DrawString(TextFormat("AC: %d", Player->ArmorClass),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Haima: %d", Player->Haima),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Kitrina: %d", Player->Kitrina),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Melana: %d", Player->Melana),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Sera: %d", Player->Sera),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    LineY = TopY;
+    LineX += MaxWidth;
+
+    DrawString(TextFormat("XP: %d", Player->XP),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+            
+}
+
+void
+DrawInventoryUI(game_state *GameState)
+{
+    entity *Player = GameState->World->PlayerEntity;
+    f32 InventoryWidth = 500.0f;
+    f32 InventoryHeight = 900.0f;
+    rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
+                              GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
+                              InventoryWidth,
+                              InventoryHeight);
+    DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
+
+    item *InventoryItem = Player->Inventory;
+    f32 LineX = InventoryRect.X + 10.0f;
+    f32 LineY = InventoryRect.Y + 10.0f;
+    for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, InventoryItem++)
+    {
+        if (InventoryItem->ItemType != ITEM_NONE)
+        {
+            int ButtonPressed = GuiButtonRect(Rect(LineX, LineY, InventoryWidth - 20.0f, 40.0f));
+            switch (ButtonPressed)
+            {
+                case SDL_BUTTON_LEFT:
+                { 
+                    SetItemToInspect(&GameState->InspectState, InventoryItem, NULL, INSPECT_ITEM_TO_DROP);
+                } break;
+
+                case SDL_BUTTON_RIGHT:
+                { 
+                    GameState->PlayerRequestedDropItem = InventoryItem;
+                } break;
+
+                default: break;
+            }
+
+            DrawString(TextFormat("%s", InventoryItem->Name),
+                       GameState->BodyFont,
+                       GameState->BodyFont->PointSize,
+                       LineX, LineY, 0,
+                       VA_WHITE,
+                       false, VA_BLACK,
+                       &GameState->ScratchArenaA);
+
+            LineY += 40.0f;
+        }
+    }
+
+}
+
+void
+DrawPickupUI(game_state *GameState)
+{
+    world *World = GameState->World;
+    entity *Player = World->PlayerEntity;
+    f32 InventoryWidth = 500.0f;
+    f32 InventoryHeight = 900.0f;
+    rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
+                              GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
+                              InventoryWidth,
+                              InventoryHeight);
+    DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
+
+    f32 LineX = InventoryRect.X + 10.0f;
+    f32 LineY = InventoryRect.Y + 10.0f;
+            
+    entity *ItemPickup = GetEntitiesAt(Player->Pos, World);
+    while (ItemPickup)
+    {
+        if (ItemPickup->Type == ENTITY_ITEM_PICKUP)
+        {
+            item *ItemFromPickup = ItemPickup->Inventory;
+            for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromPickup++)
+            {
+                if (ItemFromPickup->ItemType != ITEM_NONE)
+                {
+                    int ButtonPressed = GuiButtonRect(Rect(LineX, LineY, InventoryWidth - 20.0f, 40.0f));
+                    switch (ButtonPressed)
+                    {
+                        case SDL_BUTTON_LEFT:
+                        {
+                            SetItemToInspect(&GameState->InspectState, ItemFromPickup, ItemPickup, INSPECT_ITEM_TO_PICKUP);
+                        } break;
+
+                        case SDL_BUTTON_RIGHT:
+                        {
+                            GameState->PlayerRequestedPickupItem = ItemFromPickup;
+                            GameState->PlayerRequestedPickupItemItemPickup = ItemPickup;
+                        } break;
+
+                        default: break;
+                    }
+
+                    DrawString(TextFormat("%s", ItemFromPickup->Name),
+                               GameState->BodyFont,
+                               GameState->BodyFont->PointSize,
+                               LineX, LineY, 0,
+                               VA_WHITE,
+                               false, VA_BLACK,
+                               &GameState->ScratchArenaA);
+
+                    LineY += 40.0f;
+                }
+            }
+        }
+
+        ItemPickup = ItemPickup->Next;
+    }
+}
+
+void
+DrawLevelupUISection(const char *Label, sav_font *Font, f32 FontSize,
+                     rect Section, memory_arena *ScratchArena)
+{
+    vec2 LabelDim = GetStringDimensions(Label, Font, FontSize);
+    
+    f32 LabelX = Section.X + Section.Width * 0.5f - LabelDim.X * 0.5f;
+    f32 LabelY = Section.Height * 0.33f;
+
+    DrawString(TextFormat("%s", Label),
+               Font, FontSize,
+               LabelX, LabelY, 0,
+               VA_WHITE, false, VA_WHITE,
+               ScratchArena);
+}
+
+void
+DrawLevelupUI(game_state *GameState)
+{
+    f32 InventoryWidth = 1000.0f;
+    f32 InventoryHeight = 900.0f;
+    rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
+                              GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
+                              InventoryWidth,
+                              InventoryHeight);
+    DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
+
+    int Options = 4;
+    f32 SectionWidth = InventoryWidth / 4;
+
+    sav_font *Font = GameState->TitleFont;
+    f32 FontSize = Font->PointSize;
+    
+
+    rect Section = Rect(InventoryRect.X, InventoryRect.Y, SectionWidth, InventoryRect.Height);
+
+    DrawLevelupUISection("Haima", Font, FontSize, Section, &GameState->ScratchArenaA);
+    Section.X += SectionWidth;
+
+    DrawLevelupUISection("Kitrina", Font, FontSize, Section, &GameState->ScratchArenaA);
+    Section.X += SectionWidth;
+
+    DrawLevelupUISection("Melana", Font, FontSize, Section, &GameState->ScratchArenaA);
+    Section.X += SectionWidth;
+
+    DrawLevelupUISection("Sera", Font, FontSize, Section, &GameState->ScratchArenaA);
+    Section.X += SectionWidth;
+}
+
+void
+DrawInspectUI(game_state *GameState)
+{
+    world *World = GameState->World;
+    b32 InspectMenuInternalButtonPressed = false;
+    rect InspectRect = Rect(1500, 0, 420, 1080);
+    switch (GameState->InspectState.T)
+    {
+        case INSPECT_ENTITY:
+        {
+            entity *EntityToInspect = GameState->InspectState.IS_Entity.EntityToInspect;
+                
+            DrawRect(InspectRect, ColorAlpha(VA_BLACK, 240));
+
+            f32 LineX = 1510.0f;
+            f32 LineY = 10.0f;
+            f32 IncY = 50.0f;
+
+            if (EntityToInspect->Name)
+            {
+                DrawString(TextFormat("%s (%d)", EntityToInspect->Name, EntityToInspect->DebugID),
+                           GameState->TitleFont,
+                           GameState->TitleFont->PointSize,
+                           LineX, LineY, 0,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+                LineY += IncY;
+            }
+
+            if (EntityToInspect->MaxHealth > 0)
+            {
+                DrawString(TextFormat("HP: %d/%d", EntityToInspect->Health, EntityToInspect->MaxHealth),
+                           GameState->TitleFont,
+                           GameState->TitleFont->PointSize,
+                           LineX, LineY, 0,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+                LineY += IncY;
+                    
+                DrawString(TextFormat("AC: %d", EntityToInspect->ArmorClass),
+                           GameState->TitleFont,
+                           GameState->TitleFont->PointSize,
+                           LineX, LineY, 0,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+                LineY += IncY;
+                    
+                DrawString(TextFormat("Damage: 1d%d", EntityToInspect->Damage),
+                           GameState->TitleFont,
+                           GameState->TitleFont->PointSize,
+                           LineX, LineY, 0,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+                LineY += IncY;
+            }
+
+            if (EntityToInspect->Type == ENTITY_NPC)
+            {
+                const char *Action;
+                switch (EntityToInspect->NpcState)
+                {
+                    case NPC_STATE_IDLE:
+                    {
+                        Action = "Idle";
+                    } break;
+                        
+                    case NPC_STATE_HUNTING:
+                    {
+                        Action = "Hunting";
+                    } break;
+                        
+                    case NPC_STATE_SEARCHING:
+                    {
+                        Action = "Searching";
+                    } break;
+
+                    default:
+                    {
+                        Action = "Unknown";
+                    } break;
+                }
+
+                DrawString(TextFormat("Action: %s", Action),
+                           GameState->TitleFont,
+                           GameState->TitleFont->PointSize,
+                           LineX, LineY, 0,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+                LineY += IncY;
+            }
+            
+            if (EntityToInspect->Description)
+            {
+                DrawString(EntityToInspect->Description,
+                           GameState->BodyFont,
+                           GameState->BodyFont->PointSize,
+                           LineX, LineY, 400,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+            }
+        } break;
+
+        case INSPECT_ITEM_TO_PICKUP:
+        case INSPECT_ITEM_TO_DROP:
+        {
+            item *ItemToInspect = GameState->InspectState.IS_Item.ItemToInspect;
+            entity *ItemPickup = GameState->InspectState.IS_Item.ItemPickup;
+                
+            DrawRect(InspectRect, ColorAlpha(VA_BLACK, 240));
+
+            if (ItemToInspect->Name)
+            {
+                DrawString(TextFormat("%s", ItemToInspect->Name),
+                           GameState->TitleFont,
+                           GameState->TitleFont->PointSize,
+                           1510, 10, 0,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+
+                DrawString(TextFormat("%s", ItemToInspect->Description),
+                           GameState->BodyFont,
+                           GameState->BodyFont->PointSize,
+                           1510, 60, 400,
+                           VA_WHITE,
+                           false, VA_BLACK,
+                           &GameState->ScratchArenaA);
+
+                if (ItemToInspect->HaimaBonus > 0)
+                {
+                    DrawString(TextFormat("Haima Bonus: %d", ItemToInspect->HaimaBonus),
+                               GameState->BodyFont,
+                               GameState->BodyFont->PointSize,
+                               1510, 100, 0,
+                               VA_WHITE,
+                               false, VA_BLACK,
+                               &GameState->ScratchArenaA);
+                }
+
+                switch (GameState->InspectState.T)
+                {
+                    case INSPECT_ITEM_TO_PICKUP:
+                    {
+                        int ButtonPressed = GuiButtonRect(Rect(1510.0f, 1040.0f, InspectRect.Width - 20.0f, 40.0f));
+                        if (ButtonPressed == SDL_BUTTON_LEFT)
+                        {
+                            GameState->PlayerRequestedPickupItem = ItemToInspect;
+                            GameState->PlayerRequestedPickupItemItemPickup = ItemPickup;
+                            InspectMenuInternalButtonPressed = true;
+                        }
+
+                        DrawString("PICK UP",
+                                   GameState->TitleFont,
+                                   GameState->TitleFont->PointSize,
+                                   1510, 1040, 0,
+                                   VA_WHITE,
+                                   false, VA_BLACK,
+                                   &GameState->ScratchArenaA);
+
+                    } break;
+                        
+                    case INSPECT_ITEM_TO_DROP:
+                    {
+                        int ButtonPressed = GuiButtonRect(Rect(1510.0f, 1040.0f, InspectRect.Width - 20.0f, 40.0f));
+                        if (ButtonPressed == SDL_BUTTON_LEFT)
+                        {
+                            GameState->PlayerRequestedDropItem = ItemToInspect;
+                            InspectMenuInternalButtonPressed = true;
+                        }
+
+                        DrawString("DROP",
+                                   GameState->TitleFont,
+                                   GameState->TitleFont->PointSize,
+                                   1510, 1040, 0,
+                                   VA_WHITE,
+                                   false, VA_BLACK,
+                                   &GameState->ScratchArenaA);
+                    } break;
+
+                    default: break;
+                }
+            }
+        } break;
+
+        default: break;
+    }
+
+    if (GameState->InspectState.T != INSPECT_NONE && !GameState->InspectState.JustOpened && !InspectMenuInternalButtonPressed)
+    {
+        if (MouseReleased(SDL_BUTTON_LEFT) || MouseReleased(SDL_BUTTON_RIGHT) || KeyPressed(SDL_SCANCODE_ESCAPE))
+        {
+            ResetInspectMenu(&GameState->InspectState);
+        }
+    }
+    else if (GameState->InspectState.JustOpened)
+    {
+        GameState->InspectState.JustOpened = false;
+    }
+}
+
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
 {
@@ -1292,398 +1810,31 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         
-        // NOTE: Debug UI
+        DrawDebugUI(GameState, MouseTileP);
+        
+        DrawPlayerStatsUI(GameState, Player, MouseWorldPxP);
+
+        switch (GameState->RunState)
         {
-            DrawString(TextFormat("%0.3f FPS", GetFPSAvg(), GetDeltaAvg()),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       10, 10, 0,
-                       VA_MAROON,
-                       true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->ScratchArenaA);
-
-            DrawString(TextFormat("Tile: %d, %d", MouseTileP.X, MouseTileP.Y, GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       10, 60, 0,
-                       VA_MAROON,
-                       true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->ScratchArenaA);
-
-            DrawString(TextFormat("Darkness Level: %d", GameState->World->DarknessLevels[XYToIdx(MouseTileP.X, MouseTileP.Y, GameState->World->Width)]),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       10, 110, 0,
-                       VA_MAROON,
-                       true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->ScratchArenaA);
-
-            DrawString(TextFormat("Turn: %lld", World->TurnsPassed),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       10, 160, 0,
-                       VA_MAROON,
-                       true, ColorAlpha(VA_BLACK, 128),
-                       &GameState->ScratchArenaA);
-        }
-
-        // NOTE: Player stats UI
-        {
-            DrawRect(Rect(0, 780, 500, 1080), ColorAlpha(VA_BLACK, 240));
-
-            color PortraitColor = (((f32) Player->Health / (f32) Player->MaxHealth > 0.3f) ? VA_WHITE : Color(0xAE4642FF));
-
-            DrawTexture(GameState->PlayerPortraitTex, Rect(10, 860, 160, 160), PortraitColor);
-            if (Player->Health > 0)
+            case RUN_STATE_INVENTORY_MENU:
             {
-                vec2 PlayerPxP = Vec2(Player->Pos.X * World->TilePxW + World->TilePxW * 0.5f,
-                                      Player->Pos.Y * World->TilePxH + World->TilePxH * 0.5f);
-                vec2 EyesOffset = MouseWorldPxP - PlayerPxP;
-                f32 MaxAwayFromPlayer = 200.0f;
-                EyesOffset = (VecLengthSq(EyesOffset) > Square(MaxAwayFromPlayer) ?
-                              VecNormalize(EyesOffset) * MaxAwayFromPlayer :
-                              EyesOffset);
-                EyesOffset *= 0.05f;
-                DrawTexture(GameState->PlayerPortraitEyesTex, Rect(10.0f + EyesOffset.X, 860.0f, 160.0f, 160.0f), PortraitColor);
-            }
-
-            DrawString(TextFormat("HP: %d/%d", World->PlayerEntity->Health, World->PlayerEntity->MaxHealth),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       160, 790, 0,
-                       VA_WHITE,
-                       false, VA_BLACK,
-                       &GameState->ScratchArenaA);
-
-            DrawString(TextFormat("AC: %d", World->PlayerEntity->ArmorClass),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       160, 840, 0,
-                       VA_WHITE,
-                       false, VA_BLACK,
-                       &GameState->ScratchArenaA);
-
-            // DrawString(TextFormat("Attack: %d", World->PlayerEntity->AttackModifier),
-            //            GameState->TitleFont,
-            //            GameState->TitleFont->PointSize,
-            //            160, 890, 0,
-            //            VA_BLACK,
-            //            false, VA_BLACK,
-            //            &GameState->ScratchArenaA);
-            
-            DrawString(TextFormat("Damage: 1d%d", World->PlayerEntity->Damage),
-                       GameState->TitleFont,
-                       GameState->TitleFont->PointSize,
-                       160, 940, 0,
-                       VA_WHITE,
-                       false, VA_BLACK,
-                       &GameState->ScratchArenaA);
-        }
-
-        // NOTE: Inventory UI
-        if (GameState->RunState == RUN_STATE_INVENTORY_MENU)
-        {
-            f32 InventoryWidth = 500.0f;
-            f32 InventoryHeight = 900.0f;
-            rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
-                                      GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
-                                      InventoryWidth,
-                                      InventoryHeight);
-            DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
-
-            item *InventoryItem = Player->Inventory;
-            f32 LineX = InventoryRect.X + 10.0f;
-            f32 LineY = InventoryRect.Y + 10.0f;
-            for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, InventoryItem++)
-            {
-                if (InventoryItem->ItemType != ITEM_NONE)
-                {
-                    int ButtonPressed = GuiButtonRect(Rect(LineX, LineY, InventoryWidth - 20.0f, 40.0f));
-                    switch (ButtonPressed)
-                    {
-                        case SDL_BUTTON_LEFT:
-                        { 
-                            SetItemToInspect(&GameState->InspectState, InventoryItem, NULL, INSPECT_ITEM_TO_DROP);
-                        } break;
-
-                        case SDL_BUTTON_RIGHT:
-                        { 
-                            GameState->PlayerRequestedDropItem = InventoryItem;
-                        } break;
-
-                        default: break;
-                    }
-
-                    DrawString(TextFormat("%s", InventoryItem->Name),
-                               GameState->BodyFont,
-                               GameState->BodyFont->PointSize,
-                               LineX, LineY, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-
-                    LineY += 40.0f;
-                }
-            }
-        }
-        else if (GameState->RunState == RUN_STATE_PICKUP_MENU)
-        {
-            f32 InventoryWidth = 500.0f;
-            f32 InventoryHeight = 900.0f;
-            rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
-                                      GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
-                                      InventoryWidth,
-                                      InventoryHeight);
-            DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
-
-            f32 LineX = InventoryRect.X + 10.0f;
-            f32 LineY = InventoryRect.Y + 10.0f;
-            
-            entity *ItemPickup = GetEntitiesAt(Player->Pos, World);
-            while (ItemPickup)
-            {
-                if (ItemPickup->Type == ENTITY_ITEM_PICKUP)
-                {
-                    item *ItemFromPickup = ItemPickup->Inventory;
-                    for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromPickup++)
-                    {
-                        if (ItemFromPickup->ItemType != ITEM_NONE)
-                        {
-                            int ButtonPressed = GuiButtonRect(Rect(LineX, LineY, InventoryWidth - 20.0f, 40.0f));
-                            switch (ButtonPressed)
-                            {
-                                case SDL_BUTTON_LEFT:
-                                {
-                                    SetItemToInspect(&GameState->InspectState, ItemFromPickup, ItemPickup, INSPECT_ITEM_TO_PICKUP);
-                                } break;
-
-                                case SDL_BUTTON_RIGHT:
-                                {
-                                    GameState->PlayerRequestedPickupItem = ItemFromPickup;
-                                    GameState->PlayerRequestedPickupItemItemPickup = ItemPickup;
-                                } break;
-
-                                default: break;
-                            }
-
-                            DrawString(TextFormat("%s", ItemFromPickup->Name),
-                                       GameState->BodyFont,
-                                       GameState->BodyFont->PointSize,
-                                       LineX, LineY, 0,
-                                       VA_WHITE,
-                                       false, VA_BLACK,
-                                       &GameState->ScratchArenaA);
-
-                            LineY += 40.0f;
-                        }
-                    }
-                }
-
-                ItemPickup = ItemPickup->Next;
-            }
-        }
-
-        // NOTE: Inspect UI
-        b32 InspectMenuInternalButtonPressed = false;
-        rect InspectRect = Rect(1500, 0, 420, 1080);
-        switch (GameState->InspectState.T)
-        {
-            case INSPECT_ENTITY:
-            {
-                entity *EntityToInspect = GameState->InspectState.IS_Entity.EntityToInspect;
-                
-                DrawRect(InspectRect, ColorAlpha(VA_BLACK, 240));
-
-                f32 LineX = 1510.0f;
-                f32 LineY = 10.0f;
-                f32 IncY = 50.0f;
-
-                if (EntityToInspect->Name)
-                {
-                    DrawString(TextFormat("%s (%d)", EntityToInspect->Name, EntityToInspect->DebugID),
-                               GameState->TitleFont,
-                               GameState->TitleFont->PointSize,
-                               LineX, LineY, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-                    LineY += IncY;
-                }
-
-                if (EntityToInspect->MaxHealth > 0)
-                {
-                    DrawString(TextFormat("HP: %d/%d", EntityToInspect->Health, EntityToInspect->MaxHealth),
-                               GameState->TitleFont,
-                               GameState->TitleFont->PointSize,
-                               LineX, LineY, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-                    LineY += IncY;
-                    
-                    DrawString(TextFormat("AC: %d", EntityToInspect->ArmorClass),
-                               GameState->TitleFont,
-                               GameState->TitleFont->PointSize,
-                               LineX, LineY, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-                    LineY += IncY;
-                    
-                    DrawString(TextFormat("Damage: 1d%d", EntityToInspect->Damage),
-                               GameState->TitleFont,
-                               GameState->TitleFont->PointSize,
-                               LineX, LineY, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-                    LineY += IncY;
-                }
-
-                if (EntityToInspect->Type == ENTITY_NPC)
-                {
-                    const char *Action;
-                    switch (EntityToInspect->NpcState)
-                    {
-                        case NPC_STATE_IDLE:
-                        {
-                            Action = "Idle";
-                        } break;
-                        
-                        case NPC_STATE_HUNTING:
-                        {
-                            Action = "Hunting";
-                        } break;
-                        
-                        case NPC_STATE_SEARCHING:
-                        {
-                            Action = "Searching";
-                        } break;
-
-                        default:
-                        {
-                            Action = "Unknown";
-                        } break;
-                    }
-
-                    DrawString(TextFormat("Action: %s", Action),
-                               GameState->TitleFont,
-                               GameState->TitleFont->PointSize,
-                               LineX, LineY, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-                    LineY += IncY;
-                }
-            
-                if (EntityToInspect->Description)
-                {
-                    DrawString(EntityToInspect->Description,
-                               GameState->BodyFont,
-                               GameState->BodyFont->PointSize,
-                               LineX, LineY, 400,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-                }
+                DrawInventoryUI(GameState);
             } break;
 
-            case INSPECT_ITEM_TO_PICKUP:
-            case INSPECT_ITEM_TO_DROP:
+            case RUN_STATE_PICKUP_MENU:
             {
-                item *ItemToInspect = GameState->InspectState.IS_Item.ItemToInspect;
-                entity *ItemPickup = GameState->InspectState.IS_Item.ItemPickup;
-                
-                DrawRect(InspectRect, ColorAlpha(VA_BLACK, 240));
-
-                if (ItemToInspect->Name)
-                {
-                    DrawString(TextFormat("%s", ItemToInspect->Name),
-                               GameState->TitleFont,
-                               GameState->TitleFont->PointSize,
-                               1510, 10, 0,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-
-                    DrawString(TextFormat("%s", ItemToInspect->Description),
-                               GameState->BodyFont,
-                               GameState->BodyFont->PointSize,
-                               1510, 60, 400,
-                               VA_WHITE,
-                               false, VA_BLACK,
-                               &GameState->ScratchArenaA);
-
-                    if (ItemToInspect->HaimaBonus > 0)
-                    {
-                        DrawString(TextFormat("Haima Bonus: %d", ItemToInspect->HaimaBonus),
-                                   GameState->BodyFont,
-                                   GameState->BodyFont->PointSize,
-                                   1510, 100, 0,
-                                   VA_WHITE,
-                                   false, VA_BLACK,
-                                   &GameState->ScratchArenaA);
-                    }
-
-                    switch (GameState->InspectState.T)
-                    {
-                        case INSPECT_ITEM_TO_PICKUP:
-                        {
-                            int ButtonPressed = GuiButtonRect(Rect(1510.0f, 1040.0f, InspectRect.Width - 20.0f, 40.0f));
-                            if (ButtonPressed == SDL_BUTTON_LEFT)
-                            {
-                                GameState->PlayerRequestedPickupItem = ItemToInspect;
-                                GameState->PlayerRequestedPickupItemItemPickup = ItemPickup;
-                                InspectMenuInternalButtonPressed = true;
-                            }
-
-                            DrawString("PICK UP",
-                                       GameState->TitleFont,
-                                       GameState->TitleFont->PointSize,
-                                       1510, 1040, 0,
-                                       VA_WHITE,
-                                       false, VA_BLACK,
-                                       &GameState->ScratchArenaA);
-
-                        } break;
-                        
-                        case INSPECT_ITEM_TO_DROP:
-                        {
-                            int ButtonPressed = GuiButtonRect(Rect(1510.0f, 1040.0f, InspectRect.Width - 20.0f, 40.0f));
-                            if (ButtonPressed == SDL_BUTTON_LEFT)
-                            {
-                                GameState->PlayerRequestedDropItem = ItemToInspect;
-                                InspectMenuInternalButtonPressed = true;
-                            }
-
-                            DrawString("DROP",
-                                       GameState->TitleFont,
-                                       GameState->TitleFont->PointSize,
-                                       1510, 1040, 0,
-                                       VA_WHITE,
-                                       false, VA_BLACK,
-                                       &GameState->ScratchArenaA);
-                        } break;
-
-                        default: break;
-                    }
-                }
+                DrawPickupUI(GameState);
             } break;
+
+            // case RUN_STATE_LEVELUP_MENU:
+            // {
+            //     DrawLevelupUI(GameState);
+            // } break;
 
             default: break;
         }
 
-        if (GameState->InspectState.T != INSPECT_NONE && !GameState->InspectState.JustOpened && !InspectMenuInternalButtonPressed)
-        {
-            if (MouseReleased(SDL_BUTTON_LEFT) || MouseReleased(SDL_BUTTON_RIGHT) || KeyPressed(SDL_SCANCODE_ESCAPE))
-            {
-                ResetInspectMenu(&GameState->InspectState);
-            }
-        }
-        else if (GameState->InspectState.JustOpened)
-        {
-            GameState->InspectState.JustOpened = false;
-        }
+        DrawInspectUI(GameState);
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }

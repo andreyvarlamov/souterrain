@@ -111,6 +111,10 @@ struct entity
     int Melana;
     int Sera;
 
+    int XP;
+    int Level;
+    int XPGain;
+
     int HaimaBonus;
 
     item *Inventory;
@@ -305,6 +309,18 @@ struct inspect_state
         inspect_state_item IS_Item;
     };
 };
+
+/* struct run_state_ */
+
+/* struct run_state */
+/* { */
+/*     run_state_type T; */
+
+/*     union */
+/*     { */
+        
+/*     }; */
+/* }; */
 
 enum { MAX_WORLDS = 32 };
 
