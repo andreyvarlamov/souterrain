@@ -79,7 +79,14 @@ RunState_InGame(game_state *GameState)
                 entity *EntityToInspect = GetEntitiesAt(GameInput->MouseWorldTileP, World);
                 if (EntityToInspect)
                 {
-                    StartInspectEntity(&GameState->InspectState, EntityToInspect);
+                    const char *Action;
+                    switch (EntityToInspect->Type)
+                    {
+                        case ENTITY_NPC: Action = "TALK (Coming soon!)"; break;
+                        case ENTITY_STATUE: Action = "PRAY (Coming soon!)"; break;
+                        default: Action = NULL; break;
+                    }
+                    StartInspectEntity(&GameState->InspectState, EntityToInspect, Action);
                 }
                 else
                 {

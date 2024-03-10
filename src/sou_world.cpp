@@ -2070,13 +2070,6 @@ b32
 UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action, game_state *GameState, run_state *Out_NewRunState)
 {
     b32 TurnUsed = false;
-    if (GameState->EntityToHit)
-    {
-        EntityAttacksEntity(Player, GameState->EntityToHit, World);
-        GameState->EntityToHit = NULL;
-        TurnUsed = true;
-    }
-
     switch (Action->T)
     {
         default: break;
@@ -2251,6 +2244,17 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
                     RefreshItemPickupState(PickupItems->ItemPickups[ItemI]);
                     TurnUsed = true;
                 }
+            }
+        } break;
+
+        case ACTION_ATTACK_ENTITY:
+        {
+            req_action_attack_entity *AttackEntity = &Action->AttackEntity;
+
+            if (AttackEntity->Entity)
+            {
+                EntityAttacksEntity(Player, AttackEntity->Entity, World);
+                TurnUsed = true;
             }
         } break;
     }

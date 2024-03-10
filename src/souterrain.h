@@ -347,6 +347,7 @@ enum req_action_type
     ACTION_DROP_ITEMS,
     ACTION_PICKUP_ALL_ITEMS,
     ACTION_PICKUP_ITEMS,
+    ACTION_ATTACK_ENTITY
 };
 
 struct req_action_drop_items
@@ -362,6 +363,11 @@ struct req_action_pickup_items
     entity *ItemPickups[INVENTORY_SLOTS_PER_ENTITY];
 };
 
+struct req_action_attack_entity
+{
+    entity *Entity;
+};
+
 struct req_action
 {
     req_action_type T;
@@ -371,6 +377,7 @@ struct req_action
         vec2i DP;
         req_action_drop_items DropItems;
         req_action_pickup_items PickupItems;
+        req_action_attack_entity AttackEntity;
     };
 };
 
@@ -408,23 +415,16 @@ struct game_state
     world *OtherWorlds[MAX_WORLDS];
 
     b32 IgnoreFieldOfView;
-    b32 PlayerFovDirty;
 
     game_input GameInput;
     req_action PlayerReqAction;
 
     run_state RunState;
 
-    item *PlayerRequestedDropItem;
-    item *PlayerRequestedPickupItem;
-    entity *PlayerRequestedPickupItemItemPickup;
-
     inspect_state InspectState;
 
     b32 InventorySkipSlot[INVENTORY_SLOTS_PER_ENTITY];
     b32 PickupSkipSlot[INVENTORY_SLOTS_PER_ENTITY];
-    
-    entity *EntityToHit;
 };
 
 static_g vec2i DIRECTIONS[] = {

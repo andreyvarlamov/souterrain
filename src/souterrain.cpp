@@ -813,6 +813,7 @@ ProcessMinedWalls(world *World)
 #include "sou_rs_in_game.cpp"
 #include "sou_rs_inventory.cpp"
 #include "sou_rs_pickup.cpp"
+#include "sou_rs_ranged_attack.cpp"
 
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
@@ -1021,35 +1022,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_RANGED_ATTACK:
         {
-            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
-            if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
-            
-            if (KeyPressed(SDL_SCANCODE_ESCAPE) || KeyPressed(SDL_SCANCODE_F))
-            {
-                GameState->RunState = RUN_STATE_IN_GAME;
-            }
-            
-            if (MouseReleased(SDL_BUTTON_LEFT))
-            {
-                if (IsInRangedAttackRange(World, Player->Pos, GameInput->MouseWorldTileP, Player->RangedRange))
-                {
-                    entity *EntityToHit = GetEntitiesOfTypeAt(GameInput->MouseWorldTileP, ENTITY_NPC, World);
-                    if (EntityToHit)
-                    {
-                        GameState->EntityToHit = EntityToHit;
-                        GameState->RunState = RUN_STATE_IN_GAME;
-                    }
-                }
-            }
-
-            DrawGame(GameState, World);
-            DrawRangedAttackDebugUI(GameState);
-
-            BeginUIDraw(GameState);
-            DrawDebugUI(GameState, Vec2I(0, 0));
-            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
-            DrawInspectUI(&GameState->InspectState, GameState);
-            EndUIDraw();
+            GameState->RunState = RunState_RangedAttack(GameState);
         } break;
 
         default:
