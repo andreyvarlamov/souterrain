@@ -818,7 +818,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->DebugOverlay = SavLoadRenderTexture((int) GetWindowSize().X, (int) GetWindowSize().Y, false);
 
         // NOTE: Audio
-        // GameState->BackgroundMusic = LoadMusicStream("res/20240204 Calling.mp3");
+        GameState->BackgroundMusic = LoadMusicStream("res/20240204 Calling.mp3");
 
         int WorldW = 100;
         int WorldH = 100;
@@ -839,7 +839,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->Camera.Target = GetPxPFromTileP(GameState->World, GameState->World->PlayerEntity->Pos);
 
         // NOTE: Misc
-        // PlayMusicStream(GameState->BackgroundMusic);
+        PlayMusicStream(GameState->BackgroundMusic);
 
         GameState->IsInitialized = true;
     }

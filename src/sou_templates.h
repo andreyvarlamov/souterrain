@@ -68,10 +68,86 @@ Template_XetelStatue()
     entity Template = {};
     
     Template.Type = ENTITY_STATUE;
-    Template.Color = VA_GRAY;
+    Template.Color = VA_DARKSLATEGRAY;
     Template.Glyph = 8 + 14*16;
     Template.Name = "Statue to Xetel";
     Template.Description = "The great god of glory and ambition. He was a de facto ruler of the worlds, until his wife Latena decimated his mind and consumed his body.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_KirstStatue()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    
+    Template.Type = ENTITY_STATUE;
+    Template.Color = VA_LIGHTGRAY;
+    Template.Glyph = 0 + 15*16;
+    Template.Name = "Statue to Kirst";
+    Template.Description = "The wicked god of decay and stagnation. Worshipped by kataks for turning them into lifeless forms.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_ShlekStatue()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    
+    Template.Type = ENTITY_STATUE;
+    Template.Color = VA_SLATEGRAY;
+    Template.Glyph = 10 + 14*16;
+    Template.Name = "Statue to Shlek";
+    Template.Description = "The god of order and justice.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_TempestStatue()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    
+    Template.Type = ENTITY_STATUE;
+    Template.Color = VA_LIGHTBLUE;
+    Template.Glyph = 10 + 14*16;
+    Template.Name = "Statue to Tempest";
+    Template.Description = "The goddess of upheaval and change.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_GadekaStatue()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    
+    Template.Type = ENTITY_STATUE;
+    Template.Color = VA_LIGHTBLUE;
+    Template.Glyph = 2 + 14*16;
+    Template.Name = "Statue to Gadeka";
+    Template.Description = "The goddess of adaptation, evolution and mutation.";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
 
     return Template;
@@ -194,7 +270,109 @@ Template_AetherFly()
 
     Template.RegenActionCost = 1500;
 
-    Template.XPGain = 100;
+    Template.XPGain = 50;
+    
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_EtherealMartyr()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    Template.Type = ENTITY_NPC;
+    Template.Color = VA_BROWN;
+    Template.Glyph = 'M';
+    Template.ViewRange = 25;
+    Template.NpcState = NPC_STATE_IDLE;
+    Template.Name = "Ethereal Martyr";
+    Template.Description = "A fighter against Latena, a martyr of ethereal creatures. Hated by humans.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    Template.Haima = 13;
+    Template.Kitrina = 5;
+    Template.Melana = 5;
+    Template.Sera = 5;
+    Template.Damage = 2;
+    Template.Armor = 10;
+    SetEntityStatsBasedOnAttributes(&Template);
+
+    Template.ActionCost = 110;
+
+    Template.RegenActionCost = 1500;
+
+    Template.XPGain = 150;
+    
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_FacelessSoul()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    Template.Type = ENTITY_NPC;
+    Template.Color = VA_DARKBLUE;
+    Template.Glyph = 6 + 8*16;
+    Template.ViewRange = 25;
+    Template.NpcState = NPC_STATE_IDLE;
+    Template.Name = "Faceless Soul";
+    Template.Description = "A vagabond from the overworld. His face has decayed beyond recognition, while his body is seemingly intact.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    Template.Haima = 10;
+    Template.Kitrina = 20;
+    Template.Melana = 5;
+    Template.Sera = 5;
+    Template.Damage = 2;
+    Template.Armor = 10;
+    SetEntityStatsBasedOnAttributes(&Template);
+
+    Template.ActionCost = 110;
+
+    Template.RegenActionCost = 1500;
+
+    Template.XPGain = 250;
+    
+    return Template;
+}
+#else
+;
+#endif
+
+TEMPLATE_FUNC entity
+Template_Crane()
+#ifdef TEMPLATE_EXPORTS
+{
+    entity Template = {};
+    Template.Type = ENTITY_NPC;
+    Template.Color = VA_PINK;
+    Template.Glyph = 7 + 8*16;
+    Template.ViewRange = 25;
+    Template.NpcState = NPC_STATE_IDLE;
+    Template.Name = "Crane";
+    Template.Description = "Previously thought to be extinct species of bird. Looks like he's full of bile, ready to burst at any minute.";
+    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
+
+    Template.Haima = 10;
+    Template.Kitrina = 15;
+    Template.Melana = 5;
+    Template.Sera = 5;
+    Template.Damage = 2;
+    Template.Armor = 5;
+    SetEntityStatsBasedOnAttributes(&Template);
+
+    Template.ActionCost = 100;
+
+    Template.RegenActionCost = 1500;
+
+    Template.XPGain = 250;
     
     return Template;
 }
@@ -219,6 +397,7 @@ Template_Sword()
     Template.Description = "A rusty ceremonial sword. It was used for pharmakoi sacrifice in the age of Souwarad Expansion.";
 
     Template.HaimaBonus = 0;
+    Template.Damage = 4;
 
     return Template;
 }
@@ -239,6 +418,7 @@ Template_LeatherCuirass()
     Template.Description = "A leather cuirass";
 
     Template.HaimaBonus = 0;
+    Template.AC = 13;
 
     return Template;
 }
@@ -256,7 +436,7 @@ Template_HaimaPotion()
     Template.Glyph = '!';
     Template.Color = VA_YELLOW;
     Template.Name = "Haima Potion";
-    Template.Description = "A haima potion";
+    Template.Description = "A haima potion. {Flat bonus for now}";
 
     Template.HaimaBonus = 5;
 
@@ -279,6 +459,7 @@ Template_ShortBow()
     Template.Description = "A very common kind of short bow used by Ujik poachers to hunt game.";
 
     Template.HaimaBonus = 0;
+    Template.RangedDamage = 3;
 
     return Template;
 }
@@ -293,7 +474,7 @@ Template_ShoddyPickaxe()
     item Template = {};
     
     Template.ItemType = ITEM_PICKAXE;
-    Template.Glyph = '?';
+    Template.Glyph = 7 + 14*16;
     Template.Color = VA_DIMGREY;
     Template.Name = "Shoddy Pickaxe";
     Template.Description = "A rusty old pickaxe. Must have been left by a careless miner in the age of Souward Expansion.";

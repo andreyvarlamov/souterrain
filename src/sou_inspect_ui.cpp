@@ -144,35 +144,90 @@ DrawInspectItem(inspect_state *InspectState, game_state *GameState)
 {
     item *ItemToInspect = GameState->InspectState.IS_Item.ItemToInspect;
     entity *ItemPickup = GameState->InspectState.IS_Item.InventoryEntity;
-                
+
+    f32 LineX = 1510.0f;
+    f32 LineY = 10.0f;
+    f32 LineHeight = 50.0f;
+    
     if (ItemToInspect->Name)
     {
         DrawString(TextFormat("%s", ItemToInspect->Name),
                    GameState->TitleFont,
                    GameState->TitleFont->PointSize,
-                   1510, 10, 0,
+                   LineX, LineY, 0,
                    VA_WHITE,
                    false, VA_BLACK,
                    &GameState->ScratchArenaA);
+        LineY += LineHeight;
 
-        DrawString(TextFormat("%s", ItemToInspect->Description),
-                   GameState->BodyFont,
-                   GameState->BodyFont->PointSize,
-                   1510, 60, 400,
-                   VA_WHITE,
-                   false, VA_BLACK,
-                   &GameState->ScratchArenaA);
+        if (ItemToInspect->WallDamage > 0)
+        {
+            DrawString(TextFormat("Wall damage: %d", ItemToInspect->WallDamage),
+                       GameState->TitleFont,
+                       GameState->TitleFont->PointSize,
+                       LineX, LineY, 0,
+                       VA_WHITE,
+                       false, VA_BLACK,
+                       &GameState->ScratchArenaA);
+            LineY += LineHeight;
+        }
 
         if (ItemToInspect->HaimaBonus > 0)
         {
             DrawString(TextFormat("Haima Bonus: %d", ItemToInspect->HaimaBonus),
-                       GameState->BodyFont,
-                       GameState->BodyFont->PointSize,
-                       1510, 100, 0,
+                       GameState->TitleFont,
+                       GameState->TitleFont->PointSize,
+                       LineX, LineY, 0,
                        VA_WHITE,
                        false, VA_BLACK,
                        &GameState->ScratchArenaA);
+            LineY += LineHeight;
         }
+
+        if (ItemToInspect->AC > 0)
+        {
+            DrawString(TextFormat("AC: %d", ItemToInspect->AC),
+                       GameState->TitleFont,
+                       GameState->TitleFont->PointSize,
+                       LineX, LineY, 0,
+                       VA_WHITE,
+                       false, VA_BLACK,
+                       &GameState->ScratchArenaA);
+            LineY += LineHeight;
+        }
+
+        if (ItemToInspect->Damage > 0)
+        {
+            DrawString(TextFormat("Damage: %d", ItemToInspect->Damage),
+                       GameState->TitleFont,
+                       GameState->TitleFont->PointSize,
+                       LineX, LineY, 0,
+                       VA_WHITE,
+                       false, VA_BLACK,
+                       &GameState->ScratchArenaA);
+            LineY += LineHeight;
+        }
+
+        if (ItemToInspect->RangedDamage > 0)
+        {
+            DrawString(TextFormat("Ranged Damage: %d", ItemToInspect->RangedDamage),
+                       GameState->TitleFont,
+                       GameState->TitleFont->PointSize,
+                       LineX, LineY, 0,
+                       VA_WHITE,
+                       false, VA_BLACK,
+                       &GameState->ScratchArenaA);
+            LineY += LineHeight;
+        }
+
+        DrawString(TextFormat("%s", ItemToInspect->Description),
+                   GameState->BodyFont,
+                   GameState->BodyFont->PointSize,
+                   LineX, LineY, 400,
+                   VA_WHITE,
+                   false, VA_BLACK,
+                   &GameState->ScratchArenaA);
+        
     }
 }
 

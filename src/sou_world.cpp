@@ -687,8 +687,14 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     World->EntityTurnQueue = MemoryArena_PushArray(WorldArena, World->TurnQueueMax, entity_queue_node);
 
     entity PumiceWall = Template_PumiceWall();
-    entity LatenaStatue = Template_LatenaStatue();
-    entity XetelStatue = Template_XetelStatue();
+    entity Statues[] = {
+        Template_LatenaStatue(),
+        Template_XetelStatue(),
+        Template_KirstStatue(),
+        Template_ShlekStatue(),
+        Template_TempestStatue(),
+        Template_GadekaStatue()
+    };
     entity StairsUp = Template_StairsUp();
     entity StairsDown = Template_StairsDown();
 
@@ -730,7 +736,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
 
             case GEN_TILE_STATUE:
             {
-                entity *Statue = GetRandomValue(0, 2) ? &LatenaStatue : &XetelStatue;
+                entity *Statue = &Statues[GetRandomValue(0, ArrayCount(Statues))];
                 AddEntity(World, IdxToXY(WorldI, World->Width), Statue);
             } break;
 
@@ -797,6 +803,10 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
 
     entity AetherFly = Template_AetherFly();
+    entity EtherealMartyr = Template_EtherealMartyr();
+    entity FacelessSoul = Template_FacelessSoul();
+    entity Crane = Template_Crane();
+    
 #if 0
     int EnemyCount = 0;
     int AttemptCount = 0;
@@ -850,7 +860,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
                     // NOTE: Aether Fly room
                     int Attempt = 0;
                     int AetherFlyCount = 0;
-                    int AetherFlyMaxCount = GetRandomValue(20, 50);
+                    int AetherFlyMaxCount = GetRandomValue(20, 30);
                     while (AetherFlyCount < AetherFlyMaxCount && Attempt < MaxAttempts)
                     {
                         int X = GetRandomValue(Room->X, Room->X + Room->W);
@@ -872,7 +882,45 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
                     }
                 }
             }
+            else if (Room->Type == ROOM_SMALL || Room->Type == ROOM_MEDIUM)
+            {
+                int Value = GetRandomValue(0, 3);
+                entity *Template;
+                switch (Value)
+                {
+                    default:
+                    {
+                        Template = &EtherealMartyr;
+                    } break;
 
+                    case 1:
+                    {
+                        Template = &FacelessSoul;
+                    } break;
+
+                    case 2:
+                    {
+                        Template = &Crane;
+                    } break;
+                }
+
+                int Attempt = 0;
+                int Count = 0;
+                int MaxCount = GetRandomValue(1, 3);
+                while (Count < MaxCount && Attempt < MaxAttempts)
+                {
+                    int X = GetRandomValue(Room->X, Room->X + Room->W);
+                    int Y = GetRandomValue(Room->Y, Room->Y + Room->H);
+                    vec2i P = Vec2I(X, Y);
+                    if (!CheckCollisions(World, P).Collided)
+                    {
+                        AddEntity(World, P, Template);
+                        Count++;
+                        EnemyCount++;
+                    }
+                    Attempt++;
+                }
+            }
         }
     }
 #endif
@@ -2228,6 +2276,9 @@ ApplyItemEffectsToEntity(item *Item, entity *Entity)
     if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
     {
         Entity->Haima += Item->HaimaBonus;
+        if (Item->AC > 0) Entity->Armor = Item->AC;
+        if (Item->Damage > 0) Entity->Damage = Item->Damage;
+        if (Item->RangedDamage > 0) Entity->RangedDamage = Item->RangedDamage;
         SetEntityStatsBasedOnAttributes(Entity);
     }
 }

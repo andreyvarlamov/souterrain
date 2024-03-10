@@ -69,6 +69,9 @@ struct item
     int WallDamage;
 
     int HaimaBonus;
+    int AC;
+    int Damage;
+    int RangedDamage;
 };
 
 struct entity
