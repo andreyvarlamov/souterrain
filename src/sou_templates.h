@@ -7,6 +7,11 @@
 #define TEMPLATE_FUNC extern "C" __declspec(dllimport)
 #endif
 
+#undef TEMPLATE_FUNC
+#define TEMPLATE_FUNC inline
+
+#define TEMPLATE_EXPORTS
+
 #include "souterrain.h"
 #include "sou_level_stats.cpp"
 

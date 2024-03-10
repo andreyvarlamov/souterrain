@@ -756,7 +756,7 @@ ProcessMinedWalls(world *World)
 #include "sou_rs_ranged_attack.cpp"
 #include "sou_rs_levelup.cpp"
 
-GAME_API void
+void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
 {
     game_state *GameState = (game_state *) GameMemory.Data;

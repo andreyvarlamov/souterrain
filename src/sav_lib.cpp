@@ -276,8 +276,8 @@ InitWindow(const char *WindowName, int WindowWidth, int WindowHeight)
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         SdlState->Window = SDL_CreateWindow(WindowName,
-                                            3160, 40,
-                                            // 40, 40, //SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                            // 3160, 40,
+                                            40, 40, //SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                             WindowWidth, WindowHeight,
                                             SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
