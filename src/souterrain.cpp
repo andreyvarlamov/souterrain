@@ -76,7 +76,6 @@ DrawGround(game_state *GameState, world *World, memory_arena *ScratchArena)
         {
             glStencilMask(0xFF);
 
-            ClearBackground(VA_BLACK);
             
             glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
@@ -254,8 +253,6 @@ DrawLighting(game_state *GameState)
 {
     BeginTextureMode(GameState->LightingRenderTex, Rect(0)); BeginCameraMode(&GameState->Camera); 
     {
-        ClearBackground(ColorAlpha(VA_WHITE, 0));
-
         MemoryArena_Freeze(&GameState->ScratchArenaA);
         
         int TileCount = GameState->World->Width * GameState->World->Height;
@@ -408,6 +405,24 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
         EndCameraMode();
     }
     EndShaderMode(); EndDraw();
+}
+
+void
+DrawGame(game_state *GameState, world *World)
+{
+    game_input *GameInput = &GameState->GameInput;
+    DrawGround(GameState, World, &GameState->ScratchArenaA);
+
+    f32 LightHeight = 150.0f;
+    f32 MaxAwayFromCenter = 50.0f;
+    vec2 ScreenCenter = CameraScreenToWorld(&GameState->Camera, GetWindowSize() * 0.5f);
+    vec2 LightOffset = GameInput->MouseWorldPxP - ScreenCenter;
+    LightOffset = (VecLengthSq(LightOffset) > Square(MaxAwayFromCenter) ?
+                   VecNormalize(LightOffset) * MaxAwayFromCenter :
+                   LightOffset);
+    DrawEntities(GameState, Vec3(ScreenCenter + LightOffset, LightHeight));
+
+    DrawLighting(GameState);
 }
 
 void
@@ -928,6 +943,64 @@ DrawInspectUI(game_state *GameState)
     }
 }
 
+inline void
+BeginUIDraw(game_state *GameState)
+{
+    BeginTextureMode(GameState->UiRenderTex, GameState->UiRect);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+inline void
+EndUIDraw()
+{
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    EndTextureMode();
+}
+
+inline void
+DrawRangedAttackDebugUI(game_state *GameState)
+{
+    world *World = GameState->World;
+    entity *Player = World->PlayerEntity;
+    game_input *GameInput = &GameState->GameInput;
+    BeginTextureMode(GameState->DebugOverlay, Rect(0)); BeginCameraMode(&GameState->Camera); 
+    {
+        for (int Y = Player->Pos.Y - Player->RangedRange; Y <= Player->Pos.Y + Player->RangedRange; Y++)
+        {
+            for (int X = Player->Pos.X - Player->RangedRange; X <= Player->Pos.X + Player->RangedRange; X++)
+            {
+                vec2i P = Vec2I(X, Y);
+                if (IsInRangedAttackRange(World, Player->Pos, P, Player->RangedRange))
+                {
+                    color C = (P == GameInput->MouseWorldTileP) ? ColorAlpha(VA_RED, 200) : ColorAlpha(VA_RED, 150);
+                    DrawRect(World, P, C);
+                }
+            }
+        }
+    }
+    EndCameraMode(); EndTextureMode();
+}
+
+void
+ClearBuffers(game_state *GameState)
+{
+    BeginDraw();
+    ClearBackground(VA_BLACK);
+    EndDraw();
+
+    BeginTextureMode(GameState->DebugOverlay, Rect(0));
+    ClearBackground(ColorAlpha(VA_WHITE, 0));
+    EndTextureMode();
+
+    BeginTextureMode(GameState->UiRenderTex, GameState->UiRect);
+    ClearBackground(ColorAlpha(VA_WHITE, 0));
+    EndTextureMode();
+
+    BeginTextureMode(GameState->LightingRenderTex, Rect(0));
+    ClearBackground(ColorAlpha(VA_WHITE, 0));
+    EndTextureMode();
+}
+
 void
 ProcessInputs(game_state *GameState)
 {
@@ -1206,15 +1279,10 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
         ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
     }
-    if (KeyPressed(SDL_SCANCODE_ESCAPE))
-    {
-        if (GameState->InspectState.T == INSPECT_NONE)
-        {
-            *Quit = true;
-        }
-    }
 
     // SECTION: GAME LOGIC UPDATE
+    ClearBuffers(GameState);
+
     switch (GameState->RunState)
     {
         case RUN_STATE_NONE:
@@ -1313,6 +1381,14 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             ProcessMinedWalls(World);
 
             DeleteDeadEntities(World);
+
+            DrawGame(GameState, World);
+
+            BeginUIDraw(GameState);
+            DrawDebugUI(GameState, GameInput->MouseWorldTileP);
+            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
+            DrawInspectUI(GameState);
+            EndUIDraw();
         } break;
 
         case RUN_STATE_INVENTORY_MENU:
@@ -1342,6 +1418,15 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 RefreshItemPickupState(ItemPickup);
                 DeleteDeadEntities(World);
             }
+
+            DrawGame(GameState, World);
+
+            BeginUIDraw(GameState);
+            DrawDebugUI(GameState, Vec2I(0, 0));
+            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
+            DrawInventoryUI(GameState);
+            DrawInspectUI(GameState);
+            EndUIDraw();
         } break;
 
         case RUN_STATE_PICKUP_MENU:
@@ -1405,6 +1490,15 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 GameState->PlayerRequestedPickupItemItemPickup = NULL;
                 DeleteDeadEntities(World);
             }
+
+            DrawGame(GameState, World);
+
+            BeginUIDraw(GameState);
+            DrawDebugUI(GameState, Vec2I(0, 0));
+            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
+            DrawPickupUI(GameState);
+            DrawInspectUI(GameState);
+            EndUIDraw();
         } break;
 
         case RUN_STATE_RANGED_ATTACK:
@@ -1429,116 +1523,25 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     }
                 }
             }
+
+            DrawGame(GameState, World);
+            DrawRangedAttackDebugUI(GameState);
+
+            BeginUIDraw(GameState);
+            DrawDebugUI(GameState, Vec2I(0, 0));
+            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
+            DrawInspectUI(GameState);
+            EndUIDraw();
         } break;
 
         default:
         {
             TraceLog("Unknown run state: %d", GameState->RunState);
-            *Quit = true;
+            GameState->RunState = RUN_STATE_NONE;
         };
     }
 
     Assert(ValidateEntitySpatialPartition(GameState->World));
-
-    // static_p int VizGen = 0;
-
-    // if (KeyPressedOrRepeat(SDL_SCANCODE_RIGHT))
-    // {
-    //     VizGen++;
-    // }
-    // else if (KeyPressedOrRepeat(SDL_SCANCODE_LEFT))
-    // {
-    //     VizGen--;
-    //     if (VizGen < 0)
-    //     {
-    //         VizGen = 0;
-    //     }
-    // }
-
-    // SECTION: RENDER
-    // NOTE: Draw debug overlay
-    BeginTextureMode(GameState->DebugOverlay, Rect(0)); BeginCameraMode(&GameState->Camera); 
-    {
-        ClearBackground(ColorAlpha(VA_WHITE, 0));
-
-        if (GameState->RunState == RUN_STATE_RANGED_ATTACK)
-        {
-            for (int Y = Player->Pos.Y - Player->RangedRange; Y <= Player->Pos.Y + Player->RangedRange; Y++)
-            {
-                for (int X = Player->Pos.X - Player->RangedRange; X <= Player->Pos.X + Player->RangedRange; X++)
-                {
-                    vec2i P = Vec2I(X, Y);
-                    if (IsInRangedAttackRange(World, Player->Pos, P, Player->RangedRange))
-                    {
-                        color C = (P == GameInput->MouseWorldTileP) ? ColorAlpha(VA_RED, 200) : ColorAlpha(VA_RED, 150);
-                        DrawRect(World, P, C);
-                    }
-                }
-            }
-        }
-
-        // path_result Path = CalculatePath(World, Player->Pos, World->Exit, &GameState->ScratchArenaA, &GameState->ScratchArenaB, 512, false, VizGen);
-
-        // if (Path.FoundPath && Path.Path)
-        // {
-        //     vec2i *Step = Path.Path;
-        //     for (int i = 0; i < Path.PathSteps; i++, Step++)
-        //     {
-        //         DrawRect(World, *Step, ColorAlpha(VA_RED, 150));
-        //     }
-        // }
-    }
-    EndCameraMode(); EndTextureMode();
-
-    // NOTE: Draw UI to its own render texture
-    BeginTextureMode(GameState->UiRenderTex, GameState->UiRect);
-    {
-        ClearBackground(ColorAlpha(VA_WHITE, 0));
-
-        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        
-        DrawDebugUI(GameState, GameInput->MouseWorldTileP);
-        
-        DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
-
-        switch (GameState->RunState)
-        {
-            case RUN_STATE_INVENTORY_MENU:
-            {
-                DrawInventoryUI(GameState);
-            } break;
-
-            case RUN_STATE_PICKUP_MENU:
-            {
-                DrawPickupUI(GameState);
-            } break;
-
-            // case RUN_STATE_LEVELUP_MENU:
-            // {
-            //     DrawLevelupUI(GameState);
-            // } break;
-
-            default: break;
-        }
-
-        DrawInspectUI(GameState);
-
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    }
-    EndTextureMode();
-
-    DrawLighting(GameState);
-    
-    DrawGround(GameState, World, &GameState->ScratchArenaA);
-
-    f32 LightHeight = 150.0f;
-    f32 MaxAwayFromCenter = 50.0f;
-    vec2 ScreenCenter = CameraScreenToWorld(&GameState->Camera, GetWindowSize() * 0.5f);
-    vec2 LightOffset = GameInput->MouseWorldPxP - ScreenCenter;
-    LightOffset = (VecLengthSq(LightOffset) > Square(MaxAwayFromCenter) ?
-                   VecNormalize(LightOffset) * MaxAwayFromCenter :
-                   LightOffset);
-    DrawEntities(GameState, Vec3(ScreenCenter + LightOffset, LightHeight));
 
     BeginDraw();
     {
