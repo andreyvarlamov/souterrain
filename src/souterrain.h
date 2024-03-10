@@ -205,7 +205,7 @@ struct ground_splat
 
 struct swarm
 {
-    int Cooldown;
+    i64 Cooldown;
 };
 
 enum { MAX_SWARMS = 64 };
@@ -243,7 +243,7 @@ struct world
     
     entity *PlayerEntity;
 
-    i64 TurnsPassed;
+    i64 CurrentTurn;
 
     vec2i Exit;
 };
@@ -258,8 +258,7 @@ enum run_state
 {
     RUN_STATE_NONE = 0,
     RUN_STATE_LOAD_WORLD,
-    RUN_STATE_PROCESSING_PLAYER,
-    RUN_STATE_PROCESSING_ENTITIES,
+    RUN_STATE_IN_GAME,
     RUN_STATE_INVENTORY_MENU,
     RUN_STATE_PICKUP_MENU,
     RUN_STATE_RANGED_ATTACK,
@@ -331,16 +330,28 @@ struct game_input
     vec2i MouseWorldTileP;
 };
 
-struct player_requested_action
+enum req_action_type
 {
-    b32 SkipTurn;
-    b32 ItemDrop;
-    b32 Teleport;
-    b32 InventoryOpen;
-    b32 PickupItems;
-    b32 RangedAttack;
-    b32 NextLevel;
-    b32 PrevLevel;
+    ACTION_NONE = 0,
+    ACTION_MOVE,
+    ACTION_SKIP_TURN,
+    ACTION_ITEM_DROP,
+    ACTION_TELEPORT,
+    ACTION_OPEN_INVENTORY,
+    ACTION_OPEN_PICKUP,
+    ACTION_OPEN_RANGED_ATTACK,
+    ACTION_NEXT_LEVEL,
+    ACTION_PREV_LEVEL
+};
+
+struct req_action
+{
+    req_action_type T;
+
+    union
+    {
+        vec2i DP;
+    };
 };
 
 struct game_state
@@ -380,6 +391,7 @@ struct game_state
     b32 PlayerFovDirty;
 
     game_input GameInput;
+    req_action PlayerReqAction;
 
     run_state RunState;
 

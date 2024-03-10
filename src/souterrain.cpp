@@ -411,136 +411,6 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
 }
 
 void
-ApplyHaimaBonus(int HaimaBonus, entity *Entity)
-{
-    Entity->HaimaBonus += HaimaBonus;
-    
-    Entity->MaxHealth += HaimaBonus;
-    if (Entity->MaxHealth <= 0)
-    {
-        Entity->MaxHealth = 1;
-    }
-
-    Entity->Health += HaimaBonus;
-    if (Entity->Health <= 0)
-    {
-        Entity->Health = 1;
-    }
-}
-
-void
-RemoveItemEffectsFromEntity(item *Item, entity *Entity)
-{
-    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
-    {
-        ApplyHaimaBonus(-Item->HaimaBonus, Entity);
-    }
-}
-
-void
-ApplyItemEffectsToEntity(item *Item, entity *Entity)
-{
-    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
-    {
-        ApplyHaimaBonus(Item->HaimaBonus, Entity);
-    }
-}
-
-b32
-AddItemToEntityInventory(item *Item, entity *Entity)
-{
-    if (Entity->Inventory)
-    {
-        item *EntityItemSlot = Entity->Inventory;
-        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, EntityItemSlot++)
-        {
-            if (EntityItemSlot->ItemType == ITEM_NONE)
-            {
-                *EntityItemSlot = *Item;
-                ApplyItemEffectsToEntity(Item, Entity);
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-void
-RemoveItemFromEntityInventory(item *Item, entity *Entity)
-{
-    if (Entity->Inventory)
-    {
-        item *EntityItemSlot = Entity->Inventory;
-        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, EntityItemSlot++)
-        {
-            if (EntityItemSlot == Item)
-            {
-                RemoveItemEffectsFromEntity(EntityItemSlot, Entity);
-                EntityItemSlot->ItemType = ITEM_NONE;
-            }
-        }
-    }
-}
-
-void
-RefreshItemPickupState(entity *ItemPickup)
-{
-    int I;
-    for (I = 0; I < INVENTORY_SLOTS_PER_ENTITY; I++)
-    {
-        if (ItemPickup->Inventory[I].ItemType > ITEM_NONE)
-        {
-            break;
-        }
-    }
-
-    if (I < INVENTORY_SLOTS_PER_ENTITY)
-    {
-        ItemPickup->Glyph = ItemPickup->Inventory[I].Glyph;
-        ItemPickup->Color = ItemPickup->Inventory[I].Color;
-    }
-    else
-    {
-        ItemPickup->Health = 0;
-    }
-}
-
-void
-SetItemToInspect(inspect_state *InspectState, item *Item, entity *ItemPickup, inspect_type Type)
-{
-    Assert(Type == INSPECT_ITEM_TO_PICKUP || Type == INSPECT_ITEM_TO_DROP);
-
-    inspect_state NewInspectState = {};
-    NewInspectState.T = Type;
-    NewInspectState.JustOpened = true;
-    NewInspectState.IS_Item.ItemToInspect = Item;
-    NewInspectState.IS_Item.ItemPickup = ItemPickup;
-    
-    *InspectState = NewInspectState;
-}
-
-void
-SetEntityToInspect(inspect_state *InspectState, entity *Entity)
-{
-    inspect_state NewInspectState = {};
-    NewInspectState.T = INSPECT_ENTITY;
-    NewInspectState.JustOpened = true;
-    NewInspectState.IS_Entity.EntityToInspect = Entity;
-        
-    *InspectState = NewInspectState;
-}
-
-void
-ResetInspectMenu(inspect_state *InspectState)
-{
-    inspect_state NewInspectState = {};
-    NewInspectState.T = INSPECT_NONE;
-
-    *InspectState = NewInspectState;
-}
-
-void
 DrawDebugUI(game_state *GameState, vec2i MouseTileP)
 {
     world *World = GameState->World;
@@ -568,7 +438,7 @@ DrawDebugUI(game_state *GameState, vec2i MouseTileP)
                true, ColorAlpha(VA_BLACK, 128),
                &GameState->ScratchArenaA);
 
-    DrawString(TextFormat("Turn: %lld", World->TurnsPassed),
+    DrawString(TextFormat("Turn: %lld", World->CurrentTurn),
                GameState->TitleFont,
                GameState->TitleFont->PointSize,
                10, 160, 0,
@@ -1067,6 +937,112 @@ ProcessInputs(game_state *GameState)
     GameInput->MouseWorldTileP = GetTilePFromPxP(GameState->World, GameInput->MouseWorldPxP);
 }
 
+void
+ProcessPlayerInputs(game_state *GameState)
+{
+    req_action *Action = &GameState->PlayerReqAction; *Action = {};
+    if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1, -1); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_W)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 0, -1); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_E)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1, -1); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_A)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1,  0); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_X)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 0,  1); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_D)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1,  0); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1,  1); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_C)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1,  1); }
+    else if (KeyPressedOrRepeat(SDL_SCANCODE_S)) Action->T = ACTION_SKIP_TURN;
+    else if (KeyPressed(SDL_SCANCODE_R)) Action->T = ACTION_ITEM_DROP;
+    else if (KeyPressed(SDL_SCANCODE_T)) Action->T = ACTION_TELEPORT;
+    else if (KeyPressed(SDL_SCANCODE_I)) Action->T = ACTION_OPEN_INVENTORY;
+    else if (KeyPressed(SDL_SCANCODE_G)) Action->T = ACTION_OPEN_PICKUP;
+    else if (KeyPressed(SDL_SCANCODE_F)) Action->T = ACTION_OPEN_RANGED_ATTACK;
+    else if (KeyPressed(SDL_SCANCODE_PERIOD) && (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT))) Action->T = ACTION_NEXT_LEVEL;
+    else if (KeyPressed(SDL_SCANCODE_COMMA) && (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT))) Action->T = ACTION_PREV_LEVEL;
+}
+
+
+void
+ProcessSwarms(world *World, i64 TurnsPassed)
+{
+    swarm *Swarm = World->Swarms;
+    for (int i = 0; i < World->SwarmCount; i++, Swarm++)
+    {
+        if (Swarm->Cooldown > 0)
+        {
+            Swarm->Cooldown -= TurnsPassed;
+        }
+    }
+}
+
+void
+ProcessPlayerFOV(world *World, b32 IgnoreFieldOfView)
+{
+    if (IgnoreFieldOfView)
+    {
+        memset(World->PlayerEntity->FieldOfView, 0x1, World->Width * World->Height * sizeof(World->PlayerEntity->FieldOfView[0]));
+    }
+    else
+    {
+        memset(World->PlayerEntity->FieldOfView, 0, World->Width * World->Height * sizeof(World->PlayerEntity->FieldOfView[0]));
+        CalculateExhaustiveFOV(World, World->PlayerEntity->Pos, World->PlayerEntity->FieldOfView, World->PlayerEntity->ViewRange);
+    }
+
+    for (int i = 0; i < World->Width * World->Height; i++)
+    {
+        if (World->DarknessLevels[i] == DARKNESS_IN_VIEW)
+        {
+            World->DarknessLevels[i] = DARKNESS_SEEN;
+        }
+
+        if (IgnoreFieldOfView || World->PlayerEntity->FieldOfView == 0 || World->PlayerEntity->FieldOfView[i] == 1)
+        {
+            World->DarknessLevels[i] = DARKNESS_IN_VIEW;
+        }
+    }
+}
+
+void
+DeleteDeadEntities(world *World)
+{
+    entity *Entity = World->Entities;
+    for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
+    {
+        if (EntityExists(Entity) && EntityIsDead(Entity))
+        {
+            if (Entity->ActionCost > 0)
+            {
+                EntityTurnQueueDelete(World, Entity);
+            }
+            if (Entity->Type == ENTITY_PLAYER)
+            {
+                ProcessPlayerFOV(World, true);
+            }
+            DeleteEntity(World, Entity);
+        }
+    }
+}
+
+void
+ProcessMinedWalls(world *World)
+{
+    entity *Entity = World->Entities;
+    for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
+    {
+        if (Entity->Type == ENTITY_WALL && EntityIsDead(Entity))
+        {
+            vec2i EntityP = Entity->Pos;
+            for (int Dir = 0; Dir < 8; Dir++)
+            {
+                vec2i NeighborP = EntityP + DIRECTIONS[Dir];
+                if (IsPInBounds(NeighborP, World) && !IsPInitialized(NeighborP, World))
+                {
+                    InitializeP(NeighborP, World);
+                    entity WallTemplate = Template_PumiceWall();
+                    AddEntity(World, NeighborP, &WallTemplate);
+                }
+            }
+        }
+    }
+}
 
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
@@ -1136,7 +1112,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                                                                                            GameState->GlyphAtlas.GlyphPxW,
                                                                                            GameState->GlyphAtlas.GlyphPxH,
                                                                                            &GameState->ScratchArenaA);
-        GameState->PlayerFovDirty = true;
+
+        ProcessPlayerFOV(GameState->World, false);
         
         TraceLog("Generated world #%d. World arena used size: %zu KB. Each entity is %zu bytes.",
                  GameState->CurrentWorld, GameState->World->Arena.Used, sizeof(*GameState->World->Entities));
@@ -1148,7 +1125,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         // NOTE: Misc
         // PlayMusicStream(GameState->BackgroundMusic);
-        GameState->IgnoreFieldOfView = false;
 
         GameState->IsInitialized = true;
     }
@@ -1205,17 +1181,45 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 #endif
 
     // SECTION: CHECK INPUTS
-    if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
-
-    // SECTION: GAME LOGIC UPDATE
     game_input *GameInput = &GameState->GameInput;
     ProcessInputs(GameState);
+    if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
+    if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
+    if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
+    if (MouseReleased(SDL_BUTTON_RIGHT))
+    {
+        if (IsInFOV(World, Player->FieldOfView, GameInput->MouseWorldTileP))
+        {
+            entity *EntityToInspect = GetEntitiesAt(GameInput->MouseWorldTileP, World);
+            if (EntityToInspect)
+            {
+                SetEntityToInspect(&GameState->InspectState, EntityToInspect);
+            }
+            else
+            {
+                ResetInspectMenu(&GameState->InspectState);
+            }
+        }
+    }
+    if (KeyPressed(SDL_SCANCODE_F1))
+    {
+        GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
+        ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
+    }
+    if (KeyPressed(SDL_SCANCODE_ESCAPE))
+    {
+        if (GameState->InspectState.T == INSPECT_NONE)
+        {
+            *Quit = true;
+        }
+    }
 
+    // SECTION: GAME LOGIC UPDATE
     switch (GameState->RunState)
     {
         case RUN_STATE_NONE:
         {
-            GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+            GameState->RunState = RUN_STATE_IN_GAME;
         } break;
 
         case RUN_STATE_LOAD_WORLD:
@@ -1250,317 +1254,65 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
             GameState->Camera.Target = GetPxPFromTileP(World, Player->Pos);
 
-            GameState->PlayerFovDirty = true;
+            ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
 
             TraceLog("Loaded world #%d.", GameState->CurrentWorld);
                 
-            GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+            GameState->RunState = RUN_STATE_IN_GAME;
         } break;
 
-        case RUN_STATE_PROCESSING_PLAYER:
+        case RUN_STATE_IN_GAME:
         {
-            vec2i PlayerRequestedDP = Vec2I();
-            b32 PlayerRequestedSkipTurn = false;
-            b32 PlayerRequestedItemDrop = false;
-            b32 PlayerRequestedTeleport = false;
-            b32 PlayerRequestedInventoryOpen = false;
-            b32 PlayerRequestedPickupItems = false;
-            b32 PlayerRequestedRangedAttack = false;
-            b32 PlayerRequestedNextLevel = false;
-            b32 PlayerRequestedPrevLevel = false;
+            i64 StartTurn = World->CurrentTurn;
             
-            if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) PlayerRequestedDP = Vec2I(-1, -1);
-            if (KeyPressedOrRepeat(SDL_SCANCODE_W)) PlayerRequestedDP = Vec2I( 0, -1);
-            if (KeyPressedOrRepeat(SDL_SCANCODE_E)) PlayerRequestedDP = Vec2I( 1, -1);
-            if (KeyPressedOrRepeat(SDL_SCANCODE_A)) PlayerRequestedDP = Vec2I(-1,  0);
-            if (KeyPressedOrRepeat(SDL_SCANCODE_X)) PlayerRequestedDP = Vec2I( 0,  1);
-            if (KeyPressedOrRepeat(SDL_SCANCODE_D)) PlayerRequestedDP = Vec2I( 1,  0);
-            if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) PlayerRequestedDP = Vec2I(-1,  1);
-            if (KeyPressedOrRepeat(SDL_SCANCODE_C)) PlayerRequestedDP = Vec2I( 1,  1);
-            
-            if (KeyPressedOrRepeat(SDL_SCANCODE_S)) PlayerRequestedSkipTurn = true;
-            if (KeyPressed(SDL_SCANCODE_R)) PlayerRequestedItemDrop = true;
-            if (KeyPressed(SDL_SCANCODE_T)) PlayerRequestedTeleport = true;
-            if (KeyPressed(SDL_SCANCODE_I)) PlayerRequestedInventoryOpen = true;
-            if (KeyPressed(SDL_SCANCODE_G)) PlayerRequestedPickupItems = true;
-            if (KeyPressed(SDL_SCANCODE_F)) PlayerRequestedRangedAttack = true;
-            
-            if (KeyPressed(SDL_SCANCODE_PERIOD) &&
-                (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT)))
-            {
-                PlayerRequestedNextLevel = true;
-            }
-
-            if (KeyPressed(SDL_SCANCODE_COMMA) &&
-                (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT)))
-            {
-                PlayerRequestedPrevLevel = true;
-            }
-
-            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
-            if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
-            
-            if (KeyPressed(SDL_SCANCODE_F1))
-            {
-                GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView; 
-                GameState->PlayerFovDirty = true;
-            }
-
-            if (KeyPressed(SDL_SCANCODE_ESCAPE))
-            {
-                if (GameState->InspectState.T == INSPECT_NONE)
-                {
-                    *Quit = true;
-                }
-            }
-
             entity *ActiveEntity = EntityTurnQueuePeek(World);
-            if (ActiveEntity != Player)
-            {
-                GameState->RunState = RUN_STATE_PROCESSING_ENTITIES;
-                break;
-            }
-
-            b32 TurnUsed = false;
-            if (GameState->EntityToHit)
-            {
-                EntityAttacksEntity(Player, GameState->EntityToHit, World);
-                GameState->EntityToHit = NULL;
-                TurnUsed = true;
-            }
-
-            if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedSkipTurn || PlayerRequestedItemDrop || PlayerRequestedTeleport || PlayerRequestedInventoryOpen || PlayerRequestedPickupItems || PlayerRequestedRangedAttack || PlayerRequestedPrevLevel || PlayerRequestedNextLevel)
-            {
-                if (PlayerRequestedItemDrop)
-                {
-                    if (Player->Inventory)
-                    {
-                        entity ItemPickupTestTemplate = {};
-                        ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-                        entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
-                        Assert(ItemPickup->Inventory);
-
-                        item *ItemFromInventory = Player->Inventory;
-                        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromInventory++)
-                        {
-                            if (ItemFromInventory->ItemType > ITEM_NONE)
-                            {
-                                if (AddItemToEntityInventory(ItemFromInventory, ItemPickup))
-                                {
-                                    RemoveItemFromEntityInventory(ItemFromInventory, Player);
-                                    TurnUsed = true;
-                                }
-                            }
-                        }
-
-                        RefreshItemPickupState(ItemPickup);
-                    }
-                }
-                else if (PlayerRequestedSkipTurn)
-                {
-                    TurnUsed = true;
-                }
-                else if (PlayerRequestedInventoryOpen)
-                {
-                    ResetInspectMenu(&GameState->InspectState);
-                    GameState->RunState = RUN_STATE_INVENTORY_MENU;
-                }
-                else if (PlayerRequestedPickupItems)
-                {
-                    if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_ITEM_PICKUP, World) != NULL)
-                    {
-                        ResetInspectMenu(&GameState->InspectState);
-                        GameState->RunState = RUN_STATE_PICKUP_MENU;
-                    }
-                }
-                else if (PlayerRequestedRangedAttack)
-                {
-                    ResetInspectMenu(&GameState->InspectState);
-                    GameState->RunState = RUN_STATE_RANGED_ATTACK;
-                }
-                else if (PlayerRequestedNextLevel)
-                {
-                    if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_STAIR_DOWN, World))
-                    {
-                        if (GameState->CurrentWorld < MAX_WORLDS - 1)
-                        {
-                            GameState->CurrentWorld++;
-                            GameState->RunState = RUN_STATE_LOAD_WORLD;
-                        }
-                        else
-                        {
-                            TraceLog("The way down is caved in.");
-                        }
-                    }
-                }
-                else if (PlayerRequestedPrevLevel)
-                {
-                    if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_STAIR_UP, World))
-                    {
-                        if (GameState->CurrentWorld > 0)
-                        {
-                            GameState->CurrentWorld--;
-                            GameState->RunState = RUN_STATE_LOAD_WORLD;
-                        }
-                        else
-                        {
-                            TraceLog("The way up is caved in.");
-                        }
-                    }
-                }
-                else if (PlayerRequestedDP.X != 0 || PlayerRequestedDP.Y != 0 || PlayerRequestedTeleport)
-                {
-                    TraceLog("");
-                    TraceLog("-------------Player makes a move--------------");
-                
-                    vec2i NewP;
-                    b32 FoundPosition;
-                    if (PlayerRequestedTeleport)
-                    {
-                        int Iter = 0;
-                        int MaxIters = 10;
-                        FoundPosition = true;
-                        do
-                        {
-                            NewP = Vec2I(GetRandomValue(0, World->Width), GetRandomValue(0, World->Height));
-
-                            if (Iter++ >= MaxIters)
-                            {
-                                FoundPosition = false;
-                                break;
-                            }
-                        }
-                        while (CheckCollisions(World, NewP).Collided);
-                    }
-                    else
-                    {
-                        FoundPosition = true;
-                        NewP = World->PlayerEntity->Pos + PlayerRequestedDP;
-                    }
-                    
-                    // NOTE: Move entity can set TurnUsed to false, if that was a non-attack collision
-                    vec2i OldP = Player->Pos;
-                    if (FoundPosition && MoveEntity(World, Player, NewP, true, &TurnUsed))
-                    {
-                        if (IsPositionInCameraView(OldP, &GameState->Camera, World))
-                        {
-                            GameState->Camera.Target += GetPxPFromTileP(World, Player->Pos) - GetPxPFromTileP(World, OldP);
-                        }
-                        else
-                        {
-                            GameState->Camera.Target = GetPxPFromTileP(World, Player->Pos);
-                        }
-                    }
-                }
-            }
-
-            if (TurnUsed)
-            {
-                if (((World->TurnsPassed - World->PlayerEntity->LastHealTurn) > World->PlayerEntity->RegenActionCost) &&
-                    (World->PlayerEntity->Health < World->PlayerEntity->MaxHealth) &&
-                    (GetRandomValue(0, 2) == 0))
-                {
-                    int RegenAmount = RollDice(1, World->PlayerEntity->RegenAmount);
-                    World->PlayerEntity->Health += RegenAmount;
-                    if (World->PlayerEntity->Health > World->PlayerEntity->MaxHealth)
-                    {
-                        World->PlayerEntity->Health = World->PlayerEntity->MaxHealth;
-                    }
-                        
-                    World->PlayerEntity->LastHealTurn = World->TurnsPassed;
-                    TraceLog("Player regens %d health.", RegenAmount);
-                }
-
-                GameState->PlayerFovDirty = true;
-
-                World->TurnsPassed += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
-                ActiveEntity = EntityTurnQueuePeek(World);
-            }
-
-            if (MouseReleased(SDL_BUTTON_RIGHT))
-            {
-                if (IsInFOV(World, Player->FieldOfView, GameInput->MouseWorldTileP))
-                {
-                    entity *EntityToInspect = GetEntitiesAt(GameInput->MouseWorldTileP, World);
-                    if (EntityToInspect)
-                    {
-                        SetEntityToInspect(&GameState->InspectState, EntityToInspect);
-                    }
-                    else
-                    {
-                        ResetInspectMenu(&GameState->InspectState);
-                    }
-                }
-            }
-
-            if (ActiveEntity != Player)
-            {
-                GameState->RunState = RUN_STATE_PROCESSING_ENTITIES;
-            }
-        } break;
-
-        case RUN_STATE_PROCESSING_ENTITIES:
-        {
-            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
-            if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
-
-            if (KeyPressed(SDL_SCANCODE_ESCAPE))
-            {
-                if (GameState->InspectState.T == INSPECT_NONE)
-                {
-                    *Quit = true;
-                }
-            }
-
-            entity *StartingEntity = EntityTurnQueuePeek(World);
-            entity *ActiveEntity = StartingEntity;
-            while (ActiveEntity != World->PlayerEntity)
-            {
-
-                if (ActiveEntity->Type == ENTITY_NPC)
-                {
-                    UpdateNpcState(GameState, World, ActiveEntity);
-
-                    if (((World->TurnsPassed - ActiveEntity->LastHealTurn) > ActiveEntity->RegenActionCost) &&
-                        (ActiveEntity->Health < ActiveEntity->MaxHealth) &&
-                        (GetRandomValue(0, 2) == 0))
-                    {
-                        int RegenAmount = RollDice(1, ActiveEntity->RegenAmount);
-                        ActiveEntity->Health += RegenAmount;
-                        if (ActiveEntity->Health > ActiveEntity->MaxHealth)
-                        {
-                            ActiveEntity->Health = ActiveEntity->MaxHealth;
-                        }
-                        
-                        ActiveEntity->LastHealTurn = World->TurnsPassed;
-                        LogEntityAction(ActiveEntity, World, "%s (%d) regens %d health.", ActiveEntity->Name, ActiveEntity->DebugID, RegenAmount);
-                    }
-                }
-
-                int TurnsAdvanced = EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
-                World->TurnsPassed += TurnsAdvanced;
-                {
-                    swarm *Swarm = World->Swarms;
-                    for (int i = 0; i < World->SwarmCount; i++, Swarm++)
-                    {
-                        if (Swarm->Cooldown > 0)
-                        {
-                            Swarm->Cooldown -= TurnsAdvanced;
-                        }
-                    }
-                }
-                ActiveEntity = EntityTurnQueuePeek(World);
-
-                if (ActiveEntity == StartingEntity)
-                {
-                    break;
-                }
-            }
-
             if (ActiveEntity == Player)
             {
-                GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+                ProcessPlayerInputs(GameState);
+                b32 TurnUsed = UpdatePlayer(Player, World, &GameState->Camera, &GameState->PlayerReqAction, GameState);
+                if (TurnUsed)
+                {
+                    World->CurrentTurn += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
+                    EntityRegen(Player, World);
+                    ActiveEntity = EntityTurnQueuePeek(World);
+                    ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
+                }
             }
+
+            b32 FirstEntity = true;
+            entity *StartingEntity = ActiveEntity;
+            while (ActiveEntity != Player && (FirstEntity || ActiveEntity != StartingEntity))
+            {
+                switch (ActiveEntity->Type)
+                {
+                    case ENTITY_NPC:
+                    {
+                        b32 TurnUsed = UpdateNpc(GameState, World, ActiveEntity);
+                        if (TurnUsed)
+                        {
+                            World->CurrentTurn += EntityTurnQueuePopAndReinsert(World, ActiveEntity->ActionCost);
+                            EntityRegen(ActiveEntity, World);
+                        }
+                    } break;
+
+                    default:
+                    {
+                        EntityTurnQueuePopWithoutConsumingCost(World);
+                    } break;
+                }
+
+                ActiveEntity = EntityTurnQueuePeek(World);
+
+                FirstEntity = false;
+            }
+
+            i64 TurnsPassed = World->CurrentTurn - StartTurn;
+
+            ProcessSwarms(World, TurnsPassed);
+ 
+            ProcessMinedWalls(World);
+
+            DeleteDeadEntities(World);
         } break;
 
         case RUN_STATE_INVENTORY_MENU:
@@ -1568,7 +1320,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressed(SDL_SCANCODE_I) || KeyPressed(SDL_SCANCODE_ESCAPE))
             {
                 ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+                GameState->RunState = RUN_STATE_IN_GAME;
             }
 
             if (GameState->PlayerRequestedDropItem && GameState->PlayerRequestedDropItem->ItemType != ITEM_NONE)
@@ -1588,6 +1340,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 ResetInspectMenu(&GameState->InspectState);
 
                 RefreshItemPickupState(ItemPickup);
+                DeleteDeadEntities(World);
             }
         } break;
 
@@ -1602,7 +1355,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressed(SDL_SCANCODE_ESCAPE))
             {
                 ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+                GameState->RunState = RUN_STATE_IN_GAME;
             }
 
             if (KeyPressed(SDL_SCANCODE_G))
@@ -1632,7 +1385,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 }
 
                 ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+                GameState->RunState = RUN_STATE_IN_GAME;
             }
 
             if (GameState->PlayerRequestedPickupItem && GameState->PlayerRequestedPickupItem->ItemType != ITEM_NONE)
@@ -1650,6 +1403,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                 
                 GameState->PlayerRequestedPickupItem = NULL;
                 GameState->PlayerRequestedPickupItemItemPickup = NULL;
+                DeleteDeadEntities(World);
             }
         } break;
 
@@ -1660,7 +1414,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             
             if (KeyPressed(SDL_SCANCODE_ESCAPE) || KeyPressed(SDL_SCANCODE_F))
             {
-                GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+                GameState->RunState = RUN_STATE_IN_GAME;
             }
             
             if (MouseReleased(SDL_BUTTON_LEFT))
@@ -1671,7 +1425,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     if (EntityToHit)
                     {
                         GameState->EntityToHit = EntityToHit;
-                        GameState->RunState = RUN_STATE_PROCESSING_PLAYER;
+                        GameState->RunState = RUN_STATE_IN_GAME;
                     }
                 }
             }
@@ -1682,80 +1436,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             TraceLog("Unknown run state: %d", GameState->RunState);
             *Quit = true;
         };
-    }
-
-
-    // SECTION: GAME LOGIC POST UPDATE
-    // NOTE: Process mined walls to add new walls behind them
-    {
-        entity *Entity = World->Entities;
-        for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
-        {
-            if (Entity->Type == ENTITY_WALL && EntityIsDead(Entity))
-            {
-                vec2i EntityP = Entity->Pos;
-                for (int Dir = 0; Dir < 8; Dir++)
-                {
-                    vec2i NeighborP = EntityP + DIRECTIONS[Dir];
-                    if (IsPInBounds(NeighborP, World) && !IsPInitialized(NeighborP, World))
-                    {
-                        InitializeP(NeighborP, World);
-                        entity WallTemplate = Template_PumiceWall();
-                        AddEntity(World, NeighborP, &WallTemplate);
-                    }
-                }
-            }
-        }
-    }
-
-    // NOTE: Delete dead entities
-    {
-        entity *Entity = World->Entities;
-        for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
-        {
-            if (EntityExists(Entity) && EntityIsDead(Entity))
-            {
-                if (Entity->ActionCost > 0)
-                {
-                    EntityTurnQueueDelete(World, Entity);
-                }
-                if (Entity->Type == ENTITY_PLAYER)
-                {
-                    GameState->IgnoreFieldOfView = true;
-                    GameState->PlayerFovDirty = true;
-                }
-                DeleteEntity(World, Entity);
-            }
-        }
-    }
-
-    // TraceLog("%d calculate path calls (open set max: %d).", GetPathCallCount(), GetPathOpenSetMax());
-
-    // NOTE: Update player FOV and darkness levels
-    if (GameState->PlayerFovDirty)
-    {
-        if (GameState->IgnoreFieldOfView)
-        {
-            memset(World->PlayerEntity->FieldOfView, 0x1, World->Width * World->Height * sizeof(World->PlayerEntity->FieldOfView[0]));
-        }
-        else
-        {
-            memset(World->PlayerEntity->FieldOfView, 0, World->Width * World->Height * sizeof(World->PlayerEntity->FieldOfView[0]));
-            CalculateExhaustiveFOV(World, World->PlayerEntity->Pos, World->PlayerEntity->FieldOfView, World->PlayerEntity->ViewRange);
-        }
-
-        for (int i = 0; i < World->Width * World->Height; i++)
-        {
-            if (World->DarknessLevels[i] == DARKNESS_IN_VIEW)
-            {
-                World->DarknessLevels[i] = DARKNESS_SEEN;
-            }
-
-            if (GameState->IgnoreFieldOfView || World->PlayerEntity->FieldOfView == 0 || World->PlayerEntity->FieldOfView[i] == 1)
-            {
-                World->DarknessLevels[i] = DARKNESS_IN_VIEW;
-            }
-        }
     }
 
     Assert(ValidateEntitySpatialPartition(GameState->World));

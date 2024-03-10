@@ -1444,6 +1444,21 @@ EntityTurnQueuePeek(world *World)
 }
 
 entity *
+EntityTurnQueuePopWithoutConsumingCost(world *World)
+{
+    entity_queue_node *TopNode = World->EntityTurnQueue;
+    entity *TopEntity = TopNode->Entity;
+
+    for (int I = 0; I < World->TurnQueueCount - 1; I++)
+    {
+        World->EntityTurnQueue[I] = World->EntityTurnQueue[I + 1];
+    }
+    World->TurnQueueCount--;
+
+    return TopEntity;
+}
+
+entity *
 EntityTurnQueuePop(world *World)
 {
     entity_queue_node *TopNode = World->EntityTurnQueue;
@@ -1716,7 +1731,29 @@ LookAround(entity *Entity, world *World)
 }
 
 void
-UpdateNpcState(game_state *GameState, world *World, entity *Entity)
+EntityRegen(entity *Entity, world *World)
+{
+    if (Entity->RegenActionCost > 0)
+    {
+        b32 WillHeal = GetRandomValue(0, 2) == 0;
+        i64 TurnsSinceLastHeal = World->CurrentTurn - World->PlayerEntity->LastHealTurn;
+        if (WillHeal && TurnsSinceLastHeal > Entity->RegenActionCost && Entity->Health < Entity->MaxHealth)
+        {
+            int RegenAmount = RollDice(1, Entity->RegenAmount);
+            Entity->Health += RegenAmount;
+            if (Entity->Health > Entity->MaxHealth)
+            {
+                Entity->Health = Entity->MaxHealth;
+            }
+                        
+            Entity->LastHealTurn = World->CurrentTurn;
+            LogEntityAction(Entity, World, "%s (%d) regens %d health.", Entity->Name, Entity->DebugID, RegenAmount);
+        }
+    }
+}
+
+b32
+UpdateNpc(game_state *GameState, world *World, entity *Entity)
 {
     // NOTE: Pre-update
     switch (Entity->NpcState)
@@ -1783,6 +1820,7 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
     }
 
     // NOTE: Update
+    b32 TurnUsed = false;
     switch (Entity->NpcState)
     {
         case NPC_STATE_IDLE:
@@ -1813,7 +1851,6 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
 
                 int ShouldAttack = GetRandomValue(0, 2);
                 
-                b32 TurnUsed;
                 MoveEntity(GameState->World, Entity, NewEntityP, ShouldAttack, &TurnUsed);
             }
         } break;
@@ -1859,7 +1896,6 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             if (Path.FoundPath && Path.Path)
             {
                 vec2i NewEntityP = Path.Path[0];
-                b32 TurnUsed;
                 b32 ShouldAttack = NewEntityP == World->PlayerEntity->Pos;
                 MoveEntity(GameState->World, Entity, NewEntityP, ShouldAttack, &TurnUsed);
             }
@@ -1894,7 +1930,6 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             else if (Path.FoundPath && Path.Path)
             {
                 vec2i NewEntityP = Path.Path[0];
-                b32 TurnUsed;
                 MoveEntity(GameState->World, Entity, NewEntityP, false, &TurnUsed);
             }
             else
@@ -1909,4 +1944,290 @@ UpdateNpcState(game_state *GameState, world *World, entity *Entity)
             InvalidCodePath;
         } break;
     }
+
+    // NOTE: NPCs always use turn rn, even if they decided not to act
+    TurnUsed = true;
+    
+    return TurnUsed;
+}
+
+b32
+MovePlayer(world *World, entity *Player, vec2i NewP, camera_2d *Camera)
+{
+    vec2i OldP = Player->Pos;
+    b32 TurnUsed = false;
+    if (MoveEntity(World, Player, NewP, true, &TurnUsed))
+    {
+        if (IsPositionInCameraView(OldP, Camera, World))
+        {
+            Camera->Target += GetPxPFromTileP(World, Player->Pos) - GetPxPFromTileP(World, OldP);
+        }
+        else
+        {
+            Camera->Target = GetPxPFromTileP(World, Player->Pos);
+        }
+    }
+    return TurnUsed;
+}
+
+void
+ApplyHaimaBonus(int HaimaBonus, entity *Entity)
+{
+    Entity->HaimaBonus += HaimaBonus;
+    
+    Entity->MaxHealth += HaimaBonus;
+    if (Entity->MaxHealth <= 0)
+    {
+        Entity->MaxHealth = 1;
+    }
+
+    Entity->Health += HaimaBonus;
+    if (Entity->Health <= 0)
+    {
+        Entity->Health = 1;
+    }
+}
+
+void
+RemoveItemEffectsFromEntity(item *Item, entity *Entity)
+{
+    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
+    {
+        ApplyHaimaBonus(-Item->HaimaBonus, Entity);
+    }
+}
+
+void
+ApplyItemEffectsToEntity(item *Item, entity *Entity)
+{
+    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
+    {
+        ApplyHaimaBonus(Item->HaimaBonus, Entity);
+    }
+}
+
+b32
+AddItemToEntityInventory(item *Item, entity *Entity)
+{
+    if (Entity->Inventory)
+    {
+        item *EntityItemSlot = Entity->Inventory;
+        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, EntityItemSlot++)
+        {
+            if (EntityItemSlot->ItemType == ITEM_NONE)
+            {
+                *EntityItemSlot = *Item;
+                ApplyItemEffectsToEntity(Item, Entity);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void
+RemoveItemFromEntityInventory(item *Item, entity *Entity)
+{
+    if (Entity->Inventory)
+    {
+        item *EntityItemSlot = Entity->Inventory;
+        for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, EntityItemSlot++)
+        {
+            if (EntityItemSlot == Item)
+            {
+                RemoveItemEffectsFromEntity(EntityItemSlot, Entity);
+                EntityItemSlot->ItemType = ITEM_NONE;
+            }
+        }
+    }
+}
+
+void
+RefreshItemPickupState(entity *ItemPickup)
+{
+    int I;
+    for (I = 0; I < INVENTORY_SLOTS_PER_ENTITY; I++)
+    {
+        if (ItemPickup->Inventory[I].ItemType > ITEM_NONE)
+        {
+            break;
+        }
+    }
+
+    if (I < INVENTORY_SLOTS_PER_ENTITY)
+    {
+        ItemPickup->Glyph = ItemPickup->Inventory[I].Glyph;
+        ItemPickup->Color = ItemPickup->Inventory[I].Color;
+    }
+    else
+    {
+        ItemPickup->Health = 0;
+    }
+}
+
+void
+SetItemToInspect(inspect_state *InspectState, item *Item, entity *ItemPickup, inspect_type Type)
+{
+    Assert(Type == INSPECT_ITEM_TO_PICKUP || Type == INSPECT_ITEM_TO_DROP);
+
+    inspect_state NewInspectState = {};
+    NewInspectState.T = Type;
+    NewInspectState.JustOpened = true;
+    NewInspectState.IS_Item.ItemToInspect = Item;
+    NewInspectState.IS_Item.ItemPickup = ItemPickup;
+    
+    *InspectState = NewInspectState;
+}
+
+void
+SetEntityToInspect(inspect_state *InspectState, entity *Entity)
+{
+    inspect_state NewInspectState = {};
+    NewInspectState.T = INSPECT_ENTITY;
+    NewInspectState.JustOpened = true;
+    NewInspectState.IS_Entity.EntityToInspect = Entity;
+        
+    *InspectState = NewInspectState;
+}
+
+void
+ResetInspectMenu(inspect_state *InspectState)
+{
+    inspect_state NewInspectState = {};
+    NewInspectState.T = INSPECT_NONE;
+
+    *InspectState = NewInspectState;
+}
+
+b32
+UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action, game_state *GameState)
+{
+    b32 TurnUsed = false;
+    if (GameState->EntityToHit)
+    {
+        EntityAttacksEntity(Player, GameState->EntityToHit, World);
+        GameState->EntityToHit = NULL;
+        TurnUsed = true;
+    }
+
+    switch (Action->T)
+    {
+        default: break;
+                    
+        case ACTION_MOVE:
+        {
+            TurnUsed = MovePlayer(World, Player, Player->Pos + Action->DP, Camera);
+        } break;
+
+        case ACTION_TELEPORT:
+        {
+            vec2i NewP;
+            int Iter = 0;
+            int MaxIters = 10;
+            b32 FoundPosition = true;
+            do
+            {
+                NewP = Vec2I(GetRandomValue(0, World->Width), GetRandomValue(0, World->Height));
+
+                if (Iter++ >= MaxIters)
+                {
+                    FoundPosition = false;
+                    break;
+                }
+            }
+            while (CheckCollisions(World, NewP).Collided);
+
+            if (FoundPosition)
+            {
+                TurnUsed = MovePlayer(World, Player, NewP, Camera);
+            }
+        } break;
+
+        case ACTION_SKIP_TURN:
+        {
+            TurnUsed = true;
+        } break;
+
+        case ACTION_ITEM_DROP:
+        {
+            if (Player->Inventory)
+            {
+                entity ItemPickupTestTemplate = {};
+                ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
+                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
+                Assert(ItemPickup->Inventory);
+
+                item *ItemFromInventory = Player->Inventory;
+                for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ItemFromInventory++)
+                {
+                    if (ItemFromInventory->ItemType > ITEM_NONE)
+                    {
+                        if (AddItemToEntityInventory(ItemFromInventory, ItemPickup))
+                        {
+                            RemoveItemFromEntityInventory(ItemFromInventory, Player);
+                            TurnUsed = true;
+                        }
+                    }
+                }
+
+                RefreshItemPickupState(ItemPickup);
+            }
+        } break;
+
+        case ACTION_OPEN_INVENTORY:
+        {
+            ResetInspectMenu(&GameState->InspectState);
+            GameState->RunState = RUN_STATE_INVENTORY_MENU;
+        } break;
+
+        case ACTION_OPEN_PICKUP:
+        {
+            if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_ITEM_PICKUP, World) != NULL)
+            {
+                ResetInspectMenu(&GameState->InspectState);
+                GameState->RunState = RUN_STATE_PICKUP_MENU;
+            }
+        } break;
+
+        case ACTION_OPEN_RANGED_ATTACK:
+        {
+            ResetInspectMenu(&GameState->InspectState);
+            GameState->RunState = RUN_STATE_RANGED_ATTACK;
+        } break;
+
+        case ACTION_NEXT_LEVEL:
+        {
+            if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_STAIR_DOWN, World))
+            {
+                if (GameState->CurrentWorld < MAX_WORLDS - 1)
+                {
+                    GameState->CurrentWorld++;
+                    GameState->RunState = RUN_STATE_LOAD_WORLD;
+                }
+                else
+                {
+                    TraceLog("The way down is caved in.");
+                }
+            }
+        } break;
+
+        case ACTION_PREV_LEVEL:
+        {
+            if (GetEntitiesOfTypeAt(Player->Pos, ENTITY_STAIR_UP, World))
+            {
+                if (GameState->CurrentWorld > 0)
+                {
+                    GameState->CurrentWorld--;
+                    GameState->RunState = RUN_STATE_LOAD_WORLD;
+                }
+                else
+                {
+                    TraceLog("The way up is caved in.");
+                }
+            }
+        } break;
+    }
+
+    return TurnUsed;
 }
