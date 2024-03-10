@@ -128,7 +128,6 @@ Template_Player()
     Template.Color = VA_YELLOW;
     Template.Glyph = '@';
     Template.ViewRange = 30;
-    Template.RangedRange = 5;
     Template.Name = "Player";
     Template.Description = "After Derval's disappearance you awake in the Souterrain. You've read about this place in the dusty tomes kept in St Catherine's Library. You remember one thing: the only way is down.";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
@@ -137,10 +136,19 @@ Template_Player()
     Template.Kitrina = 9;
     Template.Melana = 5;
     Template.Sera = 3;
+
+    Template.Damage = 2; // NOTE: From weapon
+    Template.RangedDamage = 1; // NOTE: From weapon
+    Template.RangedRange = Template.Kitrina;
+    Template.FireballDamage = Template.Melana / 2;
+    Template.FireballRange = Template.Melana;
+    Template.FireballArea = Template.Melana / 2;
+    Template.RendMindDamage = Template.Sera / 2;
+    Template.RendMindRange = Template.Sera * 2;
     
     Template.ArmorClass = 10 + Max(0, (Template.Kitrina - 5) / 2);
-    Template.Damage = 2; // NOTE: From weapon
     Template.Health = Template.MaxHealth = Template.Haima;
+    Template.Mana = Template.MaxMana = Template.Melana;
 
     Template.ActionCost = 100;
 

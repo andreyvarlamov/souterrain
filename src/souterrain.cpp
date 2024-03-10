@@ -499,27 +499,9 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
 
     LineX += PortraitWidth + PaddingX;
 
-    f32 LineHeight = 37.0f;
+    f32 LineHeight = 45.0f;
     f32 MaxWidth = 180.0f;
 
-    DrawString(TextFormat("Level: %d", Player->Level),
-               GameState->TitleFont,
-               GameState->TitleFont->PointSize,
-               LineX, LineY, 0,
-               VA_WHITE,
-               false, VA_BLACK,
-               &GameState->ScratchArenaA);
-    LineY += LineHeight;
-
-    DrawString(TextFormat("HP: %d/%d", Player->Health, Player->MaxHealth),
-               GameState->TitleFont,
-               GameState->TitleFont->PointSize,
-               LineX, LineY, 0,
-               VA_WHITE,
-               false, VA_BLACK,
-               &GameState->ScratchArenaA);
-    LineY += LineHeight;
-            
     DrawString(TextFormat("AC: %d", Player->ArmorClass),
                GameState->TitleFont,
                GameState->TitleFont->PointSize,
@@ -568,6 +550,15 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
     LineY = TopY;
     LineX += MaxWidth;
 
+    DrawString(TextFormat("Level: %d", Player->Level),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
     DrawString(TextFormat("XP: %d", Player->XP),
                GameState->TitleFont,
                GameState->TitleFont->PointSize,
@@ -576,7 +567,24 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
                false, VA_BLACK,
                &GameState->ScratchArenaA);
     LineY += LineHeight;
+
+    DrawString(TextFormat("HP: %d/%d", Player->Health, Player->MaxHealth),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
             
+    DrawString(TextFormat("MP: %d/%d", Player->Mana, Player->MaxMana),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
 }
 
 void
@@ -642,30 +650,6 @@ EndUIDraw()
     EndTextureMode();
 }
 
-inline void
-DrawRangedAttackDebugUI(game_state *GameState)
-{
-    world *World = GameState->World;
-    entity *Player = World->PlayerEntity;
-    game_input *GameInput = &GameState->GameInput;
-    BeginTextureMode(GameState->DebugOverlay, Rect(0)); BeginCameraMode(&GameState->Camera); 
-    {
-        for (int Y = Player->Pos.Y - Player->RangedRange; Y <= Player->Pos.Y + Player->RangedRange; Y++)
-        {
-            for (int X = Player->Pos.X - Player->RangedRange; X <= Player->Pos.X + Player->RangedRange; X++)
-            {
-                vec2i P = Vec2I(X, Y);
-                if (IsInRangedAttackRange(World, Player->Pos, P, Player->RangedRange))
-                {
-                    color C = (P == GameInput->MouseWorldTileP) ? ColorAlpha(VA_RED, 200) : ColorAlpha(VA_RED, 150);
-                    DrawRect(World, P, C);
-                }
-            }
-        }
-    }
-    EndCameraMode(); EndTextureMode();
-}
-
 void
 ClearBuffers(game_state *GameState)
 {
@@ -719,11 +703,12 @@ ProcessPlayerInputs(req_action *Action)
     else if (KeyPressed(SDL_SCANCODE_T)) Action->T = ACTION_TELEPORT;
     else if (KeyPressed(SDL_SCANCODE_I)) Action->T = ACTION_OPEN_INVENTORY;
     else if (KeyPressed(SDL_SCANCODE_G)) Action->T = ACTION_OPEN_PICKUP;
-    else if (KeyPressed(SDL_SCANCODE_F)) Action->T = ACTION_OPEN_RANGED_ATTACK;
     else if (KeyPressed(SDL_SCANCODE_PERIOD) && (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT))) Action->T = ACTION_NEXT_LEVEL;
     else if (KeyPressed(SDL_SCANCODE_COMMA) && (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT))) Action->T = ACTION_PREV_LEVEL;
+    else if (KeyPressed(SDL_SCANCODE_F)) Action->T = ACTION_START_RANGED_ATTACK;
+    else if (KeyPressed(SDL_SCANCODE_1)) Action->T = ACTION_START_FIREBALL;
+    else if (KeyPressed(SDL_SCANCODE_2)) Action->T = ACTION_START_RENDMIND;
 }
-
 
 void
 ProcessSwarms(world *World, i64 TurnsPassed)

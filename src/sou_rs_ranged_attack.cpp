@@ -39,7 +39,79 @@ RunState_RangedAttack(game_state *GameState)
     }
             
     DrawGame(GameState, World);
-    DrawRangedAttackDebugUI(GameState);
+
+    int Range;
+    int Area;
+    switch (GameState->RangedAttackType)
+    {
+        default:
+        {
+            return RUN_STATE_IN_GAME;
+        } break;
+
+        case RANGED_WEAPON:
+        {
+            Range = Player->RangedRange;
+            Area = 1;
+        } break;
+
+        case RANGED_FIREBALL:
+        {
+            Range = Player->FireballRange;
+            Area = Player->FireballArea;
+        } break;
+
+        case RANGED_RENDMIND:
+        {
+            Range = Player->RendMindRange;
+            Area = 1;
+        } break;
+    }
+
+    b32 MouseInRange = false;
+    vec2i MouseP = GameInput->MouseWorldTileP;
+    BeginTextureMode(GameState->DebugOverlay, Rect(0)); BeginCameraMode(&GameState->Camera); 
+    {
+
+        int StartX = Player->Pos.X - Range;
+        int EndX = Player->Pos.X + Range;
+        int StartY = Player->Pos.Y - Range;
+        int EndY = Player->Pos.Y + Range;
+
+        for (int Y = StartY; Y <= EndY; Y++)
+        {
+            for (int X = StartX; X <= EndX; X++)
+            {
+                vec2i P = Vec2I(X, Y);
+                if (IsInRangedAttackRange(World, Player->Pos, P, Range))
+                {
+                    if (P == MouseP)
+                    {
+                        MouseInRange = true;
+                    }
+                    DrawRect(World, P, ColorAlpha(VA_RED, 150));
+                }
+            }
+        }
+
+        if (MouseInRange)
+        {
+            StartX = MouseP.X  - (Area - 1);
+            EndX = MouseP.X + (Area - 1);
+            StartY = MouseP.Y - (Area - 1);
+            EndY = MouseP.Y + (Area - 1);
+
+            for (int Y = StartY; Y <= EndY; Y++)
+            {
+                for (int X = StartX; X <= EndX; X++)
+                {
+                    vec2i P = Vec2I(X, Y);
+                    DrawRect(World, P, ColorAlpha(VA_RED, 200));
+                }
+            }
+        }
+    }
+    EndCameraMode(); EndTextureMode();
 
     BeginUIDraw(GameState);
     DrawDebugUI(GameState, Vec2I(0, 0));
@@ -47,22 +119,19 @@ RunState_RangedAttack(game_state *GameState)
     DrawInspectUI(&GameState->InspectState, GameState);
     EndUIDraw();
 
-    if (MouseReleased(SDL_BUTTON_LEFT))
+    if (MouseReleased(SDL_BUTTON_LEFT) && MouseInRange)
     {
-        if (IsInRangedAttackRange(World, Player->Pos, GameInput->MouseWorldTileP, Player->RangedRange))
+        if (Area != 1 || GetEntitiesOfTypeAt(MouseP, ENTITY_NPC, World) != NULL)
         {
-            entity *EntityToHit = GetEntitiesOfTypeAt(GameInput->MouseWorldTileP, ENTITY_NPC, World);
-            if (EntityToHit)
-            {
-                EndInspect(&GameState->InspectState);
-                GameState->PlayerReqAction.T = ACTION_ATTACK_ENTITY;
-                GameState->PlayerReqAction.AttackEntity.Entity = EntityToHit;
-                return RUN_STATE_IN_GAME;
-            }
+            EndInspect(&GameState->InspectState);
+            GameState->PlayerReqAction.T = ACTION_ATTACK_RANGED;
+            GameState->PlayerReqAction.AttackRanged.Target = MouseP;
+            GameState->PlayerReqAction.AttackRanged.Type = GameState->RangedAttackType;
+            return RUN_STATE_IN_GAME;
         }
     }
 
-    if (KeyPressed(SDL_SCANCODE_ESCAPE) || KeyPressed(SDL_SCANCODE_F))
+    if (KeyPressed(SDL_SCANCODE_ESCAPE) || KeyPressed(SDL_SCANCODE_F) || KeyPressed(SDL_SCANCODE_1) || KeyPressed(SDL_SCANCODE_2))
     {
         EndInspect(&GameState->InspectState);
         return RUN_STATE_IN_GAME;

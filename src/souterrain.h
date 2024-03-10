@@ -86,7 +86,6 @@ struct entity
     int ActionCost;
 
     int ViewRange;
-    int RangedRange;
     u8 *FieldOfView;
 
     u8 NpcState;
@@ -100,7 +99,9 @@ struct entity
     int Health;
     int MaxHealth;
     int ArmorClass;
-    int Damage;
+
+    int Mana;
+    int MaxMana;
 
     i64 LastHealTurn;
     int RegenActionCost;
@@ -111,6 +112,15 @@ struct entity
     int Melana;
     int Sera;
 
+    int Damage;
+    int RangedDamage;
+    int RangedRange;
+    int FireballDamage;
+    int FireballRange;
+    int FireballArea;
+    int RendMindDamage;
+    int RendMindRange;
+    
     int XP;
     int Level;
     int XPGain;
@@ -340,14 +350,16 @@ enum req_action_type
     ACTION_TELEPORT,
     ACTION_OPEN_INVENTORY,
     ACTION_OPEN_PICKUP,
-    ACTION_OPEN_RANGED_ATTACK,
     ACTION_NEXT_LEVEL,
     ACTION_PREV_LEVEL,
     ACTION_DROP_ALL_ITEMS,
     ACTION_DROP_ITEMS,
     ACTION_PICKUP_ALL_ITEMS,
     ACTION_PICKUP_ITEMS,
-    ACTION_ATTACK_ENTITY
+    ACTION_START_RANGED_ATTACK,
+    ACTION_START_FIREBALL,
+    ACTION_START_RENDMIND,
+    ACTION_ATTACK_RANGED,
 };
 
 struct req_action_drop_items
@@ -363,9 +375,18 @@ struct req_action_pickup_items
     entity *ItemPickups[INVENTORY_SLOTS_PER_ENTITY];
 };
 
-struct req_action_attack_entity
+enum ranged_attack_type
 {
-    entity *Entity;
+    RANGED_NONE,
+    RANGED_WEAPON,
+    RANGED_FIREBALL,
+    RANGED_RENDMIND
+};
+
+struct req_action_attack_ranged
+{
+    vec2i Target;
+    ranged_attack_type Type;
 };
 
 struct req_action
@@ -377,7 +398,7 @@ struct req_action
         vec2i DP;
         req_action_drop_items DropItems;
         req_action_pickup_items PickupItems;
-        req_action_attack_entity AttackEntity;
+        req_action_attack_ranged AttackRanged;
     };
 };
 
@@ -415,7 +436,7 @@ struct game_state
     world *OtherWorlds[MAX_WORLDS];
 
     b32 IgnoreFieldOfView;
-
+    
     game_input GameInput;
     req_action PlayerReqAction;
 
@@ -423,6 +444,8 @@ struct game_state
 
     inspect_state InspectState;
 
+    ranged_attack_type RangedAttackType;
+    
     b32 InventorySkipSlot[INVENTORY_SLOTS_PER_ENTITY];
     b32 PickupSkipSlot[INVENTORY_SLOTS_PER_ENTITY];
 };

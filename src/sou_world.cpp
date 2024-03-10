@@ -1575,48 +1575,266 @@ EntityXPGain(entity *Entity, int XP)
     }
 }
 
+b32
+DamageEntity(entity *Entity, int Damage)
+{
+    Entity->Health -= Damage;
+    return Entity->Health <= 0;
+}
+
 void
-EntityAttacksEntity(entity *Attacker, entity *Defender, world *World)
+EntityAttacksMelee(entity *Attacker, entity *Defender, world *World)
 {
     int AttackRoll = RollDice(1, 20);
 
     b32 AttackConnects = AttackRoll + Attacker->Kitrina > Defender->ArmorClass;
 
+    b32 AttackMisses = false;
     if (AttackConnects)
     {
         int DamageValue = RollDice(1, Attacker->Damage) + Max(0, (Attacker->Haima - 5) / 2);
-        Defender->Health -= DamageValue;
-
-        if (Defender->Health > 0)
+        if (DamageValue > 0)
         {
-            LogEntityAction(Attacker, World,
-                            "%s (%d) hits %s (%d) for %d damage (%d + %d > %d). Health: %d.",
-                            Attacker->Name, Attacker->DebugID,
-                            Defender->Name, Defender->DebugID,
-                            DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass,
-                            Defender->Health);
+            b32 Killed = DamageEntity(Defender, DamageValue);
+            if (Killed)
+            {
+                if (Attacker == World->PlayerEntity)
+                {
+                    EntityXPGain(Attacker, Defender->XPGain);
+                }
+            
+                LogEntityAction(Attacker, World,
+                                "%s (%d) hits %s (%d) for %d damage (%d + %d > %d), killing them.",
+                                Attacker->Name, Attacker->DebugID,
+                                Defender->Name, Defender->DebugID,
+                                DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass);
+            }
+            else
+            {
+                LogEntityAction(Attacker, World,
+                                "%s (%d) hits %s (%d) for %d damage (%d + %d > %d). Health: %d.",
+                                Attacker->Name, Attacker->DebugID,
+                                Defender->Name, Defender->DebugID,
+                                DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass,
+                                Defender->Health);
+            }
         }
         else
         {
-            if (Attacker == World->PlayerEntity)
-            {
-                EntityXPGain(Attacker, Defender->XPGain);
-            }
-            
-            LogEntityAction(Attacker, World,
-                            "%s (%d) hits %s (%d) for %d damage (%d + %d > %d), killing them.",
-                            Attacker->Name, Attacker->DebugID,
-                            Defender->Name, Defender->DebugID,
-                            DamageValue, AttackRoll, Attacker->Kitrina, Defender->ArmorClass);
+            AttackMisses = true;
         }
     }
     else
+    {
+        AttackMisses = true;
+    }
+
+    if (AttackMisses)
     {
         LogEntityAction(Attacker, World,
                         "%s (%d) misses %s (%d) (%d + %d <= %d).",
                         Attacker->Name, Attacker->DebugID,
                         Defender->Name, Defender->DebugID,
                         AttackRoll, Attacker->Kitrina, Defender->ArmorClass);
+    }
+}
+
+b32
+EntityAttacksRanged(entity *Attacker, vec2i Target, ranged_attack_type RangedAttackType, world *World)
+{
+    switch (RangedAttackType)
+    {
+        case RANGED_WEAPON:
+        {
+            entity *EntityToHit = GetEntitiesOfTypeAt(Target, ENTITY_NPC, World);
+            if (EntityToHit)
+            {
+                int AttackRoll = RollDice(1, 20);
+                b32 AttackConnects = AttackRoll + Attacker->Kitrina > EntityToHit->ArmorClass;
+                b32 AttackMisses = false;
+                if (AttackConnects)
+                {
+                    int DamageValue = RollDice(1, Attacker->RangedDamage) + Max(0, Attacker->Kitrina - 5) / 2;
+                    if (DamageValue > 0)
+                    {
+                        b32 Killed = DamageEntity(EntityToHit, DamageValue);
+                        if (Killed)
+                        {
+                            if (Attacker == World->PlayerEntity)
+                            {
+                                EntityXPGain(Attacker, EntityToHit->XPGain);
+                            }
+                            
+                            LogEntityAction(Attacker, World,
+                                            "%s (%d) shoots %s (%d) for %d damage, killing them.",
+                                            Attacker->Name, Attacker->DebugID,
+                                            EntityToHit->Name, EntityToHit->DebugID,
+                                            DamageValue);
+                        }
+                        else
+                        {
+                            LogEntityAction(Attacker, World,
+                                            "%s (%d) shoots %s (%d) for %d damage. Health: %d.",
+                                            Attacker->Name, Attacker->DebugID,
+                                            EntityToHit->Name, EntityToHit->DebugID,
+                                            DamageValue, EntityToHit->Health);
+                        }
+                    }
+                    else
+                    {
+                        AttackMisses = true;
+                    }
+                }
+                else
+                {
+                    AttackMisses = true;
+                }
+
+                if (AttackMisses)
+                {
+                    LogEntityAction(Attacker, World,
+                                    "%s (%d) tries to shoot %s (%d), but misses.",
+                                    Attacker->Name, Attacker->DebugID,
+                                    EntityToHit->Name, EntityToHit->DebugID);
+                }
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        } break;
+
+        case RANGED_FIREBALL:
+        {
+            int Area = Attacker->FireballArea;
+            int StartX = Target.X  - (Area - 1);
+            int EndX = Target.X + (Area - 1);
+            int StartY = Target.Y - (Area - 1);
+            int EndY = Target.Y + (Area - 1);
+
+            int FireballCost = 2;
+            if (Attacker->Mana >= FireballCost)
+            {
+                Attacker->Mana -= FireballCost;
+            }
+            else
+            {
+                LogEntityAction(Attacker, World, "Not enough mana to shoot a fireball!");
+                return false;
+            }
+
+            int AttackRoll = RollDice(1, 20);
+            b32 AttackConnects = AttackRoll + Attacker->Melana > 10;
+            int DamageValue = RollDice(1, Attacker->FireballDamage) + Max(0, Attacker->Melana - 5) / 2;
+            
+            if (AttackConnects && DamageValue > 0)
+            {
+                for (int Y = StartY; Y <= EndY; Y++)
+                {
+                    for (int X = StartX; X <= EndX; X++)
+                    {
+                        vec2i P = Vec2I(X, Y);
+                        entity *EntityToHit = GetEntitiesOfTypeAt(P, ENTITY_NPC, World);
+                        if (EntityToHit)
+                        {
+                            b32 Killed = DamageEntity(EntityToHit, DamageValue);
+                            if (Killed)
+                            {
+                                if (Attacker == World->PlayerEntity)
+                                {
+                                    EntityXPGain(Attacker, EntityToHit->XPGain);
+                                }
+                            
+                                LogEntityAction(Attacker, World,
+                                                "%s (%d) shoots fireball at %s (%d) for %d damage, killing them.",
+                                                Attacker->Name, Attacker->DebugID,
+                                                EntityToHit->Name, EntityToHit->DebugID,
+                                                DamageValue);
+                            }
+                            else
+                            {
+                                LogEntityAction(Attacker, World,
+                                                "%s (%d) shoots fireball at %s (%d) for %d damage. Health: %d.",
+                                                Attacker->Name, Attacker->DebugID,
+                                                EntityToHit->Name, EntityToHit->DebugID,
+                                                DamageValue, EntityToHit->Health);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                LogEntityAction(Attacker, World,
+                                "%s (%d) tries to shoot fireball, but misses.",
+                                Attacker->Name, Attacker->DebugID);
+            }
+            return true;
+        } break;
+
+        case RANGED_RENDMIND:
+        {
+            entity *EntityToHit = GetEntitiesOfTypeAt(Target, ENTITY_NPC, World);
+            if (EntityToHit)
+            {
+                int AttackRoll = RollDice(1, 20);
+                b32 AttackConnects = AttackRoll + Attacker->Sera > EntityToHit->ArmorClass;
+                b32 AttackMisses = false;
+                if (AttackConnects)
+                {
+                    int DamageValue = RollDice(1, Attacker->RendMindDamage) + Max(0, Attacker->Sera - 5) / 2;
+                    if (DamageValue > 0)
+                    {
+                        b32 Killed = DamageEntity(EntityToHit, DamageValue);
+                        if (Killed)
+                        {
+                            if (Attacker == World->PlayerEntity)
+                            {
+                                EntityXPGain(Attacker, EntityToHit->XPGain);
+                            }
+                            
+                            LogEntityAction(Attacker, World,
+                                            "%s (%d) rends the mind of %s (%d) for %d damage, killing them.",
+                                            Attacker->Name, Attacker->DebugID,
+                                            EntityToHit->Name, EntityToHit->DebugID,
+                                            DamageValue);
+                        }
+                        else
+                        {
+                            LogEntityAction(Attacker, World,
+                                            "%s (%d) rends the mind of %s (%d) for %d damage. Health: %d.",
+                                            Attacker->Name, Attacker->DebugID,
+                                            EntityToHit->Name, EntityToHit->DebugID,
+                                            DamageValue, EntityToHit->Health);
+                        }
+                    }
+                    else
+                    {
+                        AttackMisses = true;
+                    }
+                }
+                else
+                {
+                    AttackMisses = true;
+                }
+
+                if (AttackMisses)
+                {
+                    LogEntityAction(Attacker, World,
+                                    "%s (%d) tries to rend the mind of %s (%d), but fails.",
+                                    Attacker->Name, Attacker->DebugID,
+                                    EntityToHit->Name, EntityToHit->DebugID);
+                }
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        } break;
+
+        default: return false;
     }
 }
 
@@ -1665,7 +1883,7 @@ ResolveEntityCollision(entity *ActiveEntity, entity *PassiveEntity, world *World
                 {
                     if (ShouldAttack)
                     {
-                        EntityAttacksEntity(ActiveEntity, PassiveEntity, World);
+                        EntityAttacksMelee(ActiveEntity, PassiveEntity, World);
                         return true;
                     }
                     return false;
@@ -1745,9 +1963,15 @@ EntityRegen(entity *Entity, world *World)
             {
                 Entity->Health = Entity->MaxHealth;
             }
+
+            Entity->Mana += 1;
+            if (Entity->Mana > Entity->MaxMana)
+            {
+                Entity->Mana = Entity->MaxMana;
+            }
                         
             Entity->LastHealTurn = World->CurrentTurn;
-            LogEntityAction(Entity, World, "%s (%d) regens %d health.", Entity->Name, Entity->DebugID, RegenAmount);
+            // LogEntityAction(Entity, World, "%s (%d) regens %d health.", Entity->Name, Entity->DebugID, RegenAmount);
         }
     }
 }
@@ -2153,11 +2377,6 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
             }
         } break;
 
-        case ACTION_OPEN_RANGED_ATTACK:
-        {
-            *Out_NewRunState = RUN_STATE_RANGED_ATTACK;
-        } break;
-
         case ACTION_DROP_ALL_ITEMS:
         {
             if (Player->Inventory)
@@ -2247,15 +2466,28 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
             }
         } break;
 
-        case ACTION_ATTACK_ENTITY:
+        case ACTION_START_RANGED_ATTACK:
         {
-            req_action_attack_entity *AttackEntity = &Action->AttackEntity;
+            GameState->RangedAttackType = RANGED_WEAPON;
+            *Out_NewRunState = RUN_STATE_RANGED_ATTACK;
+        } break;
 
-            if (AttackEntity->Entity)
-            {
-                EntityAttacksEntity(Player, AttackEntity->Entity, World);
-                TurnUsed = true;
-            }
+        case ACTION_START_FIREBALL:
+        {
+            GameState->RangedAttackType = RANGED_FIREBALL;
+            *Out_NewRunState = RUN_STATE_RANGED_ATTACK;
+        } break;
+
+        case ACTION_START_RENDMIND:
+        {
+            GameState->RangedAttackType = RANGED_RENDMIND;
+            *Out_NewRunState = RUN_STATE_RANGED_ATTACK;
+        } break;
+
+        case ACTION_ATTACK_RANGED:
+        {
+            req_action_attack_ranged *AttackRanged = &Action->AttackRanged;
+            TurnUsed = EntityAttacksRanged(Player, AttackRanged->Target, AttackRanged->Type, World);
         } break;
     }
 
