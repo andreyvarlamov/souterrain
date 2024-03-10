@@ -324,6 +324,25 @@ struct inspect_state
 
 enum { MAX_WORLDS = 32 };
 
+struct game_input
+{
+    vec2 MouseP;
+    vec2 MouseWorldPxP;
+    vec2i MouseWorldTileP;
+};
+
+struct player_requested_action
+{
+    b32 SkipTurn;
+    b32 ItemDrop;
+    b32 Teleport;
+    b32 InventoryOpen;
+    b32 PickupItems;
+    b32 RangedAttack;
+    b32 NextLevel;
+    b32 PrevLevel;
+};
+
 struct game_state
 {
     b32 IsInitialized;
@@ -357,12 +376,10 @@ struct game_state
     int CurrentWorld;
     world *OtherWorlds[MAX_WORLDS];
 
-    vec2 *GroundPoints;
-    vec2 *GroundRots;
-    int GroundPointCount;
-
     b32 IgnoreFieldOfView;
     b32 PlayerFovDirty;
+
+    game_input GameInput;
 
     run_state RunState;
 

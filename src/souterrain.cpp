@@ -1058,6 +1058,16 @@ DrawInspectUI(game_state *GameState)
     }
 }
 
+void
+ProcessInputs(game_state *GameState)
+{
+    game_input *GameInput = &GameState->GameInput;
+    GameInput->MouseP = GetMousePos();
+    GameInput->MouseWorldPxP = CameraScreenToWorld(&GameState->Camera, GetMousePos());
+    GameInput->MouseWorldTileP = GetTilePFromPxP(GameState->World, GameInput->MouseWorldPxP);
+}
+
+
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
 {
@@ -1179,7 +1189,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->DebugOverlay = SavLoadRenderTexture((int) GetWindowSize().X, (int) GetWindowSize().Y, false);
     }
 
-    // SECTION: CHECK INPUTS
 #ifdef SAV_DEBUG  
     if (KeyPressed(SDL_SCANCODE_B))
     {
@@ -1195,15 +1204,13 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     }
 #endif
 
+    // SECTION: CHECK INPUTS
     if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
 
-    vec2 MouseP = GetMousePos();
-    vec2 MouseWorldPxP = CameraScreenToWorld(&GameState->Camera, MouseP);
-    vec2i MouseTileP = GetTilePFromPxP(World, MouseWorldPxP);
-
-    // ResetPathCallCount();
-
     // SECTION: GAME LOGIC UPDATE
+    game_input *GameInput = &GameState->GameInput;
+    ProcessInputs(GameState);
+
     switch (GameState->RunState)
     {
         case RUN_STATE_NONE:
@@ -1270,6 +1277,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressedOrRepeat(SDL_SCANCODE_D)) PlayerRequestedDP = Vec2I( 1,  0);
             if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) PlayerRequestedDP = Vec2I(-1,  1);
             if (KeyPressedOrRepeat(SDL_SCANCODE_C)) PlayerRequestedDP = Vec2I( 1,  1);
+            
             if (KeyPressedOrRepeat(SDL_SCANCODE_S)) PlayerRequestedSkipTurn = true;
             if (KeyPressed(SDL_SCANCODE_R)) PlayerRequestedItemDrop = true;
             if (KeyPressed(SDL_SCANCODE_T)) PlayerRequestedTeleport = true;
@@ -1305,7 +1313,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     *Quit = true;
                 }
             }
-
 
             entity *ActiveEntity = EntityTurnQueuePeek(World);
             if (ActiveEntity != Player)
@@ -1472,9 +1479,9 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
             if (MouseReleased(SDL_BUTTON_RIGHT))
             {
-                if (IsInFOV(World, Player->FieldOfView, MouseTileP))
+                if (IsInFOV(World, Player->FieldOfView, GameInput->MouseWorldTileP))
                 {
-                    entity *EntityToInspect = GetEntitiesAt(MouseTileP, World);
+                    entity *EntityToInspect = GetEntitiesAt(GameInput->MouseWorldTileP, World);
                     if (EntityToInspect)
                     {
                         SetEntityToInspect(&GameState->InspectState, EntityToInspect);
@@ -1658,9 +1665,9 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             
             if (MouseReleased(SDL_BUTTON_LEFT))
             {
-                if (IsInRangedAttackRange(World, Player->Pos, MouseTileP, Player->RangedRange))
+                if (IsInRangedAttackRange(World, Player->Pos, GameInput->MouseWorldTileP, Player->RangedRange))
                 {
-                    entity *EntityToHit = GetEntitiesOfTypeAt(MouseTileP, ENTITY_NPC, World);
+                    entity *EntityToHit = GetEntitiesOfTypeAt(GameInput->MouseWorldTileP, ENTITY_NPC, World);
                     if (EntityToHit)
                     {
                         GameState->EntityToHit = EntityToHit;
@@ -1783,7 +1790,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     vec2i P = Vec2I(X, Y);
                     if (IsInRangedAttackRange(World, Player->Pos, P, Player->RangedRange))
                     {
-                        color C = (P == MouseTileP) ? ColorAlpha(VA_RED, 200) : ColorAlpha(VA_RED, 150);
+                        color C = (P == GameInput->MouseWorldTileP) ? ColorAlpha(VA_RED, 200) : ColorAlpha(VA_RED, 150);
                         DrawRect(World, P, C);
                     }
                 }
@@ -1810,9 +1817,9 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         
-        DrawDebugUI(GameState, MouseTileP);
+        DrawDebugUI(GameState, GameInput->MouseWorldTileP);
         
-        DrawPlayerStatsUI(GameState, Player, MouseWorldPxP);
+        DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
 
         switch (GameState->RunState)
         {
@@ -1847,7 +1854,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     f32 LightHeight = 150.0f;
     f32 MaxAwayFromCenter = 50.0f;
     vec2 ScreenCenter = CameraScreenToWorld(&GameState->Camera, GetWindowSize() * 0.5f);
-    vec2 LightOffset = MouseWorldPxP - ScreenCenter;
+    vec2 LightOffset = GameInput->MouseWorldPxP - ScreenCenter;
     LightOffset = (VecLengthSq(LightOffset) > Square(MaxAwayFromCenter) ?
                    VecNormalize(LightOffset) * MaxAwayFromCenter :
                    LightOffset);
