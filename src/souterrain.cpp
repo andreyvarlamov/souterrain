@@ -580,55 +580,6 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
 }
 
 void
-DrawInventoryUI(game_state *GameState)
-{
-    entity *Player = GameState->World->PlayerEntity;
-    f32 InventoryWidth = 500.0f;
-    f32 InventoryHeight = 900.0f;
-    rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
-                              GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
-                              InventoryWidth,
-                              InventoryHeight);
-    DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
-
-    item *InventoryItem = Player->Inventory;
-    f32 LineX = InventoryRect.X + 10.0f;
-    f32 LineY = InventoryRect.Y + 10.0f;
-    for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, InventoryItem++)
-    {
-        if (InventoryItem->ItemType != ITEM_NONE)
-        {
-            int ButtonPressed = GuiButtonRect(Rect(LineX, LineY, InventoryWidth - 20.0f, 40.0f));
-            switch (ButtonPressed)
-            {
-                case SDL_BUTTON_LEFT:
-                { 
-                    SetItemToInspect(&GameState->InspectState, InventoryItem, NULL, INSPECT_ITEM_TO_DROP);
-                } break;
-
-                case SDL_BUTTON_RIGHT:
-                { 
-                    GameState->PlayerRequestedDropItem = InventoryItem;
-                } break;
-
-                default: break;
-            }
-
-            DrawString(TextFormat("%s", InventoryItem->Name),
-                       GameState->BodyFont,
-                       GameState->BodyFont->PointSize,
-                       LineX, LineY, 0,
-                       VA_WHITE,
-                       false, VA_BLACK,
-                       &GameState->ScratchArenaA);
-
-            LineY += 40.0f;
-        }
-    }
-
-}
-
-void
 DrawPickupUI(game_state *GameState)
 {
     world *World = GameState->World;
@@ -1011,9 +962,16 @@ ProcessInputs(game_state *GameState)
 }
 
 void
-ProcessPlayerInputs(game_state *GameState)
+ResetPlayerInputs(req_action *Action)
 {
-    req_action *Action = &GameState->PlayerReqAction; *Action = {};
+    *Action = {};
+}
+
+void
+ProcessPlayerInputs(req_action *Action)
+{
+    if (Action->T != ACTION_NONE) return;
+    
     if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1, -1); }
     else if (KeyPressedOrRepeat(SDL_SCANCODE_W)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 0, -1); }
     else if (KeyPressedOrRepeat(SDL_SCANCODE_E)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1, -1); }
@@ -1023,7 +981,7 @@ ProcessPlayerInputs(game_state *GameState)
     else if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1,  1); }
     else if (KeyPressedOrRepeat(SDL_SCANCODE_C)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1,  1); }
     else if (KeyPressedOrRepeat(SDL_SCANCODE_S)) Action->T = ACTION_SKIP_TURN;
-    else if (KeyPressed(SDL_SCANCODE_R)) Action->T = ACTION_ITEM_DROP;
+    else if (KeyPressed(SDL_SCANCODE_R)) Action->T = ACTION_DROP_ALL_ITEMS;
     else if (KeyPressed(SDL_SCANCODE_T)) Action->T = ACTION_TELEPORT;
     else if (KeyPressed(SDL_SCANCODE_I)) Action->T = ACTION_OPEN_INVENTORY;
     else if (KeyPressed(SDL_SCANCODE_G)) Action->T = ACTION_OPEN_PICKUP;
@@ -1116,6 +1074,8 @@ ProcessMinedWalls(world *World)
         }
     }
 }
+
+#include "sou_rs_inventory.cpp"
 
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
@@ -1336,7 +1296,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             entity *ActiveEntity = EntityTurnQueuePeek(World);
             if (ActiveEntity == Player)
             {
-                ProcessPlayerInputs(GameState);
+                ProcessPlayerInputs(&GameState->PlayerReqAction);
                 b32 TurnUsed = UpdatePlayer(Player, World, &GameState->Camera, &GameState->PlayerReqAction, GameState);
                 if (TurnUsed)
                 {
@@ -1345,6 +1305,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
                     ActiveEntity = EntityTurnQueuePeek(World);
                     ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
                 }
+                ResetPlayerInputs(&GameState->PlayerReqAction);
             }
 
             b32 FirstEntity = true;
@@ -1393,40 +1354,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_INVENTORY_MENU:
         {
-            if (KeyPressed(SDL_SCANCODE_I) || KeyPressed(SDL_SCANCODE_ESCAPE))
-            {
-                ResetInspectMenu(&GameState->InspectState);
-                GameState->RunState = RUN_STATE_IN_GAME;
-            }
-
-            if (GameState->PlayerRequestedDropItem && GameState->PlayerRequestedDropItem->ItemType != ITEM_NONE)
-            {
-                entity ItemPickupTestTemplate = {};
-                ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
-                entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
-                Assert(ItemPickup->Inventory);
-
-                if (AddItemToEntityInventory(GameState->PlayerRequestedDropItem, ItemPickup))
-                {
-                    RemoveItemFromEntityInventory(GameState->PlayerRequestedDropItem, Player);
-                }
-
-                GameState->PlayerRequestedDropItem = NULL;
-
-                ResetInspectMenu(&GameState->InspectState);
-
-                RefreshItemPickupState(ItemPickup);
-                DeleteDeadEntities(World);
-            }
-
-            DrawGame(GameState, World);
-
-            BeginUIDraw(GameState);
-            DrawDebugUI(GameState, Vec2I(0, 0));
-            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
-            DrawInventoryUI(GameState);
-            DrawInspectUI(GameState);
-            EndUIDraw();
+            GameState->RunState = RunState_InventoryMenu(GameState);
         } break;
 
         case RUN_STATE_PICKUP_MENU:

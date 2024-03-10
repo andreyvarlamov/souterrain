@@ -335,13 +335,28 @@ enum req_action_type
     ACTION_NONE = 0,
     ACTION_MOVE,
     ACTION_SKIP_TURN,
-    ACTION_ITEM_DROP,
+    ACTION_DROP_ALL_ITEMS,
     ACTION_TELEPORT,
     ACTION_OPEN_INVENTORY,
     ACTION_OPEN_PICKUP,
     ACTION_OPEN_RANGED_ATTACK,
     ACTION_NEXT_LEVEL,
-    ACTION_PREV_LEVEL
+    ACTION_PREV_LEVEL,
+    ACTION_DROP_ITEMS,
+    ACTION_PICKUP_ITEMS,
+};
+
+struct req_action_drop_items
+{
+    int ItemCount;
+    item *Items[INVENTORY_SLOTS_PER_ENTITY];
+};
+
+struct req_action_pickup_items
+{
+    item ItemCount;
+    item *Items[INVENTORY_SLOTS_PER_ENTITY];
+    entity *ItemPickups[INVENTORY_SLOTS_PER_ENTITY];
 };
 
 struct req_action
@@ -351,6 +366,8 @@ struct req_action
     union
     {
         vec2i DP;
+        req_action_drop_items DropItems;
+        req_action_pickup_items PickupItems;
     };
 };
 
@@ -400,6 +417,8 @@ struct game_state
     entity *PlayerRequestedPickupItemItemPickup;
 
     inspect_state InspectState;
+
+    b32 InventorySkipSlot[INVENTORY_SLOTS_PER_ENTITY];
 
     
     entity *EntityToHit;

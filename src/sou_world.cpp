@@ -2149,7 +2149,7 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
             TurnUsed = true;
         } break;
 
-        case ACTION_ITEM_DROP:
+        case ACTION_DROP_ALL_ITEMS:
         {
             if (Player->Inventory)
             {
@@ -2226,6 +2226,30 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
                     TraceLog("The way up is caved in.");
                 }
             }
+        } break;
+
+        case ACTION_DROP_ITEMS:
+        {
+            entity ItemPickupTestTemplate = {};
+            ItemPickupTestTemplate.Type = ENTITY_ITEM_PICKUP;
+            entity *ItemPickup = AddEntity(World, Player->Pos, &ItemPickupTestTemplate);
+            Assert(ItemPickup->Inventory);
+
+            req_action_drop_items *DropItems = &Action->DropItems;
+
+            for (int ItemI = 0; ItemI < DropItems->ItemCount; ItemI++)
+            {
+                if (AddItemToEntityInventory(DropItems->Items[ItemI], ItemPickup))
+                {
+                    RemoveItemFromEntityInventory(DropItems->Items[ItemI], Player);
+                }
+            }
+
+            ResetInspectMenu(&GameState->InspectState);
+
+            RefreshItemPickupState(ItemPickup);
+
+            TurnUsed = true;
         } break;
     }
 
