@@ -1950,10 +1950,10 @@ GuiButtonRect(rect R)
     b32 MouseInRect = IsPInRect(MouseP, R);
     if (MouseInRect)
     {
-        color C = ColorAlpha(VA_BLACK, 128);
+        color C = Color(0x202020FF);
         if (MouseDown(SDL_BUTTON_LEFT) || MouseDown(SDL_BUTTON_RIGHT))
         {
-            C = ColorAlpha(VA_BLACK, 200);
+            C = Color(0x505050FF);
         }
         DrawRect(R, C);
         int MouseButtonReleased = (MouseReleased(SDL_BUTTON_LEFT) ? SDL_BUTTON_LEFT : (MouseReleased(SDL_BUTTON_RIGHT) ? SDL_BUTTON_RIGHT : 0));
@@ -2037,6 +2037,11 @@ TraceLog(const char *Format, ...)
 int
 GetRandomValue(int Min, int Max)
 {
+    if (Max - Min <= 0)
+    {
+         return 0;
+    }
+
     return (Min + rand() % (Max - Min));
 }
 

@@ -616,9 +616,11 @@ CopyEntity(entity *From, entity *To, world *ToWorld)
     To->Health = From->Health;
     To->MaxHealth = From->MaxHealth;
     To->ArmorClass = From->ArmorClass;
-    To->Damage = From->Damage;
 
-    To->LastHealTurn = From->LastHealTurn;
+    To->Mana = From->Mana;
+    To->MaxMana = From->MaxMana;
+
+    // To->LastHealTurn = From->LastHealTurn;
     To->RegenActionCost = From->RegenActionCost;
     To->RegenAmount = From->RegenAmount;
 
@@ -628,6 +630,21 @@ CopyEntity(entity *From, entity *To, world *ToWorld)
     To->Sera = From->Sera;
 
     To->HaimaBonus = From->HaimaBonus;
+
+    To->Armor = From->Armor;
+    To->Damage = From->Damage;
+    To->RangedDamage = From->RangedDamage;
+
+    To->RangedRange = From->RangedRange;
+    To->FireballDamage = From->FireballDamage;
+    To->FireballRange = From->FireballRange;
+    To->FireballArea = From->FireballArea;
+    To->RendMindDamage = From->RendMindDamage;
+    To->RendMindRange = From->RendMindRange;
+
+    To->XP = From->XP;
+    To->Level = From->Level;
+
 
     Assert(To->Inventory || !From->Inventory);
     CopyEntityInventory(From, To);
@@ -1572,6 +1589,7 @@ EntityXPGain(entity *Entity, int XP)
     if (Entity->XP >= GetXPNeededForLevel(Entity->Level + 1))
     {
         Entity->Level++;
+        Entity->GainedLevel = true;
     }
 }
 
@@ -2194,30 +2212,14 @@ MovePlayer(world *World, entity *Player, vec2i NewP, camera_2d *Camera)
     return TurnUsed;
 }
 
-void
-ApplyHaimaBonus(int HaimaBonus, entity *Entity)
-{
-    Entity->HaimaBonus += HaimaBonus;
-    
-    Entity->MaxHealth += HaimaBonus;
-    if (Entity->MaxHealth <= 0)
-    {
-        Entity->MaxHealth = 1;
-    }
-
-    Entity->Health += HaimaBonus;
-    if (Entity->Health <= 0)
-    {
-        Entity->Health = 1;
-    }
-}
 
 void
 RemoveItemEffectsFromEntity(item *Item, entity *Entity)
 {
     if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
     {
-        ApplyHaimaBonus(-Item->HaimaBonus, Entity);
+        Entity->Haima -= Item->HaimaBonus;
+        SetEntityStatsBasedOnAttributes(Entity);
     }
 }
 
@@ -2226,7 +2228,8 @@ ApplyItemEffectsToEntity(item *Item, entity *Entity)
 {
     if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
     {
-        ApplyHaimaBonus(Item->HaimaBonus, Entity);
+        Entity->Haima += Item->HaimaBonus;
+        SetEntityStatsBasedOnAttributes(Entity);
     }
 }
 

@@ -112,8 +112,12 @@ struct entity
     int Melana;
     int Sera;
 
+    int HaimaBonus;
+
+    int Armor;
     int Damage;
     int RangedDamage;
+    
     int RangedRange;
     int FireballDamage;
     int FireballRange;
@@ -123,9 +127,10 @@ struct entity
     
     int XP;
     int Level;
+    b32 GainedLevel;
+    
     int XPGain;
 
-    int HaimaBonus;
 
     item *Inventory;
 
@@ -269,9 +274,10 @@ enum run_state
     RUN_STATE_NONE = 0,
     RUN_STATE_LOAD_WORLD,
     RUN_STATE_IN_GAME,
+    RUN_STATE_RANGED_ATTACK,
     RUN_STATE_INVENTORY_MENU,
     RUN_STATE_PICKUP_MENU,
-    RUN_STATE_RANGED_ATTACK,
+    RUN_STATE_LEVELUP_MENU,
     RUN_STATE_COUNT,
 };
 
@@ -421,6 +427,10 @@ struct game_state
     sav_shader Glyph3DShader;
     sav_texture PlayerPortraitTex;
     sav_texture PlayerPortraitEyesTex;
+    sav_texture HaimaTex;
+    sav_texture KitrinaTex;
+    sav_texture MelanaTex;
+    sav_texture SeraTex;
 
     music_stream BackgroundMusic;
     camera_2d Camera;

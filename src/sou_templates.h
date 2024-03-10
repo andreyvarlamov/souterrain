@@ -8,6 +8,7 @@
 #endif
 
 #include "souterrain.h"
+#include "sou_level_stats.cpp"
 
 TEMPLATE_FUNC void
 Template_DUMMY()
@@ -89,7 +90,7 @@ Template_StairsUp()
     Template.Color = VA_ORANGE;
     Template.Glyph = '<';
     Template.Name = "Stairs Up";
-    Template.Description = "Press Shift+W to go to the higher level of Souterrain.";
+    Template.Description = "Press < to go to the higher level of Souterrain.";
 
     return Template;
 }
@@ -107,7 +108,7 @@ Template_StairsDown()
     Template.Color = VA_ORANGE;
     Template.Glyph = '>';
     Template.Name = "Stairs Down";
-    Template.Description = "Press Shift+X to go to the lower level of Souterrain.";
+    Template.Description = "Press > to go to the lower level of Souterrain.";
 
     return Template;
 }
@@ -136,24 +137,14 @@ Template_Player()
     Template.Kitrina = 9;
     Template.Melana = 5;
     Template.Sera = 3;
-
     Template.Damage = 2; // NOTE: From weapon
     Template.RangedDamage = 1; // NOTE: From weapon
-    Template.RangedRange = Template.Kitrina;
-    Template.FireballDamage = Template.Melana / 2;
-    Template.FireballRange = Template.Melana;
-    Template.FireballArea = Template.Melana / 2;
-    Template.RendMindDamage = Template.Sera / 2;
-    Template.RendMindRange = Template.Sera * 2;
-    
-    Template.ArmorClass = 10 + Max(0, (Template.Kitrina - 5) / 2);
-    Template.Health = Template.MaxHealth = Template.Haima;
-    Template.Mana = Template.MaxMana = Template.Melana;
+    Template.Armor = 10; // NOTE: From weapon
+    SetEntityStatsBasedOnAttributes(&Template);
 
     Template.ActionCost = 100;
 
     Template.RegenActionCost = 1000;
-    Template.RegenAmount = 2;
 
     return Template;
 }
@@ -179,17 +170,15 @@ Template_AetherFly()
     Template.Kitrina = 5;
     Template.Melana = 1;
     Template.Sera = 1;
-  
-    Template.ArmorClass = 10 + Max(0, (Template.Kitrina - 5) / 2);
     Template.Damage = 1;
-    Template.Health = Template.MaxHealth = Template.Haima;
+    Template.Armor = 10;
+    SetEntityStatsBasedOnAttributes(&Template);
 
     Template.ActionCost = 80;
 
     Template.RegenActionCost = 1500;
-    Template.RegenAmount = 1;
 
-    Template.XPGain = 10;
+    Template.XPGain = 100;
     
     return Template;
 }

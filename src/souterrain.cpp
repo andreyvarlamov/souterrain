@@ -587,55 +587,6 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
     LineY += LineHeight;
 }
 
-void
-DrawLevelupUISection(const char *Label, sav_font *Font, f32 FontSize,
-                     rect Section, memory_arena *ScratchArena)
-{
-    vec2 LabelDim = GetStringDimensions(Label, Font, FontSize);
-    
-    f32 LabelX = Section.X + Section.Width * 0.5f - LabelDim.X * 0.5f;
-    f32 LabelY = Section.Height * 0.33f;
-
-    DrawString(TextFormat("%s", Label),
-               Font, FontSize,
-               LabelX, LabelY, 0,
-               VA_WHITE, false, VA_WHITE,
-               ScratchArena);
-}
-
-void
-DrawLevelupUI(game_state *GameState)
-{
-    f32 InventoryWidth = 1000.0f;
-    f32 InventoryHeight = 900.0f;
-    rect InventoryRect = Rect(GameState->UiRenderTex.Texture.Width * 0.5f - InventoryWidth * 0.5f,
-                              GameState->UiRenderTex.Texture.Height * 0.5f - InventoryHeight * 0.5f,
-                              InventoryWidth,
-                              InventoryHeight);
-    DrawRect(InventoryRect, ColorAlpha(VA_BLACK, 240));
-
-    int Options = 4;
-    f32 SectionWidth = InventoryWidth / 4;
-
-    sav_font *Font = GameState->TitleFont;
-    f32 FontSize = Font->PointSize;
-    
-
-    rect Section = Rect(InventoryRect.X, InventoryRect.Y, SectionWidth, InventoryRect.Height);
-
-    DrawLevelupUISection("Haima", Font, FontSize, Section, &GameState->ScratchArenaA);
-    Section.X += SectionWidth;
-
-    DrawLevelupUISection("Kitrina", Font, FontSize, Section, &GameState->ScratchArenaA);
-    Section.X += SectionWidth;
-
-    DrawLevelupUISection("Melana", Font, FontSize, Section, &GameState->ScratchArenaA);
-    Section.X += SectionWidth;
-
-    DrawLevelupUISection("Sera", Font, FontSize, Section, &GameState->ScratchArenaA);
-    Section.X += SectionWidth;
-}
-
 inline void
 BeginUIDraw(game_state *GameState)
 {
@@ -799,6 +750,7 @@ ProcessMinedWalls(world *World)
 #include "sou_rs_inventory.cpp"
 #include "sou_rs_pickup.cpp"
 #include "sou_rs_ranged_attack.cpp"
+#include "sou_rs_levelup.cpp"
 
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
@@ -851,7 +803,11 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->GroundBrushRect = Rect(GameState->GroundBrushTex.Width, GameState->GroundBrushTex.Width);
         GameState->PlayerPortraitTex = SavLoadTexture("res/PlayerPortraitCursed.png");
         GameState->PlayerPortraitEyesTex = SavLoadTexture("res/PlayerPortraitEyes.png");
-
+        GameState->HaimaTex = SavLoadTexture("res/haima.png");
+        GameState->KitrinaTex = SavLoadTexture("res/kitrina.png");
+        GameState->MelanaTex = SavLoadTexture("res/melana.png");
+        GameState->SeraTex = SavLoadTexture("res/sera.png");
+        
         // NOTE: Render textures
         GameState->UiRect = Rect(GetWindowSize());
         GameState->UiRenderTex = SavLoadRenderTexture((int) GetWindowOrigSize().X, (int) GetWindowOrigSize().Y, false);
@@ -990,6 +946,11 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             GameState->RunState = RUN_STATE_IN_GAME;
         } break;
 
+        case RUN_STATE_RANGED_ATTACK:
+        {
+            GameState->RunState = RunState_RangedAttack(GameState);
+        } break;
+
         case RUN_STATE_IN_GAME:
         {
             GameState->RunState = RunState_InGame(GameState);
@@ -1005,9 +966,9 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             GameState->RunState = RunState_PickupMenu(GameState);
         } break;
 
-        case RUN_STATE_RANGED_ATTACK:
+        case RUN_STATE_LEVELUP_MENU:
         {
-            GameState->RunState = RunState_RangedAttack(GameState);
+            GameState->RunState = RunState_LevelupMenu(GameState);
         } break;
 
         default:

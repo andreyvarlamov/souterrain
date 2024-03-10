@@ -32,6 +32,11 @@ RunState_InGame(game_state *GameState)
             ActiveEntity = EntityTurnQueuePeek(World);
             ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
         }
+        if (Player->GainedLevel)
+        {
+            NewRunState = RUN_STATE_LEVELUP_MENU;
+            Player->GainedLevel = false;
+        }
         ResetPlayerInputs(&GameState->PlayerReqAction);
     }
 
