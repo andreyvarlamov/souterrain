@@ -272,12 +272,14 @@ struct collision_info
 enum run_state
 {
     RUN_STATE_NONE = 0,
+    RUN_STATE_MAIN_MENU,
     RUN_STATE_LOAD_WORLD,
     RUN_STATE_IN_GAME,
     RUN_STATE_RANGED_ATTACK,
     RUN_STATE_INVENTORY_MENU,
     RUN_STATE_PICKUP_MENU,
     RUN_STATE_LEVELUP_MENU,
+    RUN_STATE_QUIT,
     RUN_STATE_COUNT,
 };
 
@@ -417,6 +419,7 @@ struct game_state
     memory_arena ScratchArenaB;
 
     sav_font *TitleFont;
+    sav_font *TitleFont64;
     sav_font *BodyFont;
     glyph_atlas GlyphAtlas;
     sav_texture GlyphAtlasNormalTex;
@@ -431,6 +434,7 @@ struct game_state
     sav_texture KitrinaTex;
     sav_texture MelanaTex;
     sav_texture SeraTex;
+    sav_texture TitleTex;
 
     music_stream BackgroundMusic;
     camera_2d Camera;

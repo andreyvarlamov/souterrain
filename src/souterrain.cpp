@@ -746,6 +746,7 @@ ProcessMinedWalls(world *World)
 }
 
 #include "sou_inspect_ui.cpp"
+#include "sou_rs_main_menu.cpp"
 #include "sou_rs_in_game.cpp"
 #include "sou_rs_inventory.cpp"
 #include "sou_rs_pickup.cpp"
@@ -785,6 +786,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         // NOTE: Fonts
         GameState->TitleFont = SavLoadFont(&GameState->ResourceArena, "res/ProtestStrike-Regular.ttf", 32);
+        GameState->TitleFont64 = SavLoadFont(&GameState->ResourceArena, "res/ProtestStrike-Regular.ttf", 64);
         GameState->BodyFont = SavLoadFont(&GameState->ResourceArena, "res/GildaDisplay-Regular.ttf", 28);
         // GameState->BodyFont = SavLoadFont(&GameState->ResourceArena, "res/ProtestStrike-Regular.ttf", 28);
 
@@ -807,6 +809,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->KitrinaTex = SavLoadTexture("res/kitrina.png");
         GameState->MelanaTex = SavLoadTexture("res/melana.png");
         GameState->SeraTex = SavLoadTexture("res/sera.png");
+        GameState->TitleTex = SavLoadTexture("res/souterrain_title.png");
         
         // NOTE: Render textures
         GameState->UiRect = Rect(GetWindowSize());
@@ -904,7 +907,12 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     {
         case RUN_STATE_NONE:
         {
-            GameState->RunState = RUN_STATE_IN_GAME;
+            GameState->RunState = RUN_STATE_MAIN_MENU;
+        } break;
+
+        case RUN_STATE_MAIN_MENU:
+        {
+            GameState->RunState = RunState_MainMenu(GameState);
         } break;
 
         case RUN_STATE_LOAD_WORLD:
@@ -969,6 +977,11 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         case RUN_STATE_LEVELUP_MENU:
         {
             GameState->RunState = RunState_LevelupMenu(GameState);
+        } break;
+
+        case RUN_STATE_QUIT:
+        {
+            *Quit = true;
         } break;
 
         default:
