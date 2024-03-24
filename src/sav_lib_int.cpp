@@ -70,12 +70,14 @@ struct game_code
 
 struct gl_state
 {
-    u32 DefaultShader;
+    sav_shader DefaultShader;
     u32 DefaultVBO;
     u32 DefaultVAO;
     u32 DefaultEBO;
     int MaxVertexCount;
     int MaxIndexCount;
+    u32 MatricesUBO;
+    u32 MatricesUBOBindingPoint;
 
     u32 DefaultTextureGlid;
 
@@ -88,7 +90,7 @@ struct gl_state
 
     b32 DrawReady;
 
-    u32 CurrentShader;
+    sav_shader CurrentShader;
 };
 
 // SECTION: Internal state
@@ -98,9 +100,5 @@ static_g gl_state gGlState;
 static_g input_state gInputState;
 static_g game_code gGameCode;
 static_g u64 gCurrentFrame;
-
-// SECTION: Internal functions header
-
-static_i u32 BuildBasicShader();
 
 #endif

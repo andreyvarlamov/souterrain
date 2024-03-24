@@ -168,6 +168,7 @@ SAV_API sav_shader BuildCustomShader(const char *VertPath, const char *FragPath)
 SAV_API void DeleteShader(sav_shader *Shader);
 SAV_API void BeginShaderMode(sav_shader Shader);
 SAV_API void EndShaderMode();
+SAV_API void SetShaderMatricesBindingPoint(sav_shader Shader, const char *UBOName);
 SAV_API void SetUniformMat4(const char *UniformName, f32 *Value);
 SAV_API void SetUniformVec3(const char *UniformName, f32 *Value);
 SAV_API void SetUniformVec4(const char *UniformName, f32 *Value);
@@ -182,7 +183,7 @@ SAV_API void SavSwapBuffers();
 SAV_API void ClearBackground(color Color);
 SAV_API void BeginDraw();
 SAV_API void EndDraw();
-SAV_API void PrepareGpuData(u32 *VBO, u32 *VAO, u32 *EBO, int MaxVertexCount, int MaxIndexCount);
+SAV_API void PrepareGpuData(u32 *VBO, u32 *VAO, u32 *EBO, int MaxVertexCount, int MaxIndexCount, u32 *MatricesUBO, u32 MatricesUBOBindingPoint);
 SAV_API void DrawVertices(vec3 *Positions, vec4 *TexCoords, vec4 *Colors, u32 *Indices, int VertexCount, int IndexCount);
 SAV_API void DrawTexture(sav_texture Texture, rect Dest, rect Source, vec2 Origin, f32 Rotation, color Color);
 SAV_API void DrawRect(rect Rect, color Color);

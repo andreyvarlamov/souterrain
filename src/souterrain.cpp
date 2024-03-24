@@ -773,6 +773,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         // NOTE: Shaders
         GameState->GroundShader = BuildCustomShader("res/ground.vs", "res/ground.fs");
+        SetShaderMatricesBindingPoint(GameState->GroundShader, "Matrices");
         BeginShaderMode(GameState->GroundShader);
         {
             SetUniformI("sprite", 1);
@@ -780,6 +781,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         }
         EndShaderMode();
         GameState->Glyph3DShader = BuildCustomShader("res/glyph3d.vs", "res/glyph3d.fs");
+        SetShaderMatricesBindingPoint(GameState->Glyph3DShader, "Matrices");
         BeginShaderMode(GameState->Glyph3DShader);
         {
             SetUniformI("diffuse", 1);

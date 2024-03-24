@@ -260,6 +260,9 @@ ReloadGameCode(void **UpdateAndRenderFunc)
 }
 
 // SECTION: Program state/sdl window
+
+static_i sav_shader BuildBasicShader();
+
 b32
 InitWindow(const char *WindowName, int WindowWidth, int WindowHeight)
 {
@@ -339,20 +342,26 @@ InitWindow(const char *WindowName, int WindowWidth, int WindowHeight)
                 gl_state *GlState = &gGlState;
                 GlState->DefaultTextureGlid = DefaultTexture.Glid;
 
-                GlState->DefaultShader = BuildBasicShader();
                 GlState->MaxVertexCount = 65536;
                 GlState->MaxIndexCount = 393216;
+                GlState->MatricesUBOBindingPoint = 0;
                 PrepareGpuData(&GlState->DefaultVBO,
                                &GlState->DefaultVAO,
                                &GlState->DefaultEBO,
                                GlState->MaxVertexCount,
-                               GlState->MaxIndexCount);
+                               GlState->MaxIndexCount,
+                               &GlState->MatricesUBO,
+                               GlState->MatricesUBOBindingPoint);
 
+                GlState->DefaultShader = BuildBasicShader();
                 GlState->CurrentShader = GlState->DefaultShader;
-                UseProgram(GlState->CurrentShader);
+                UseProgram(GlState->CurrentShader.Glid);
+                SetShaderMatricesBindingPoint(GlState->DefaultShader, "Matrices");
+                
                 SetProjectionMatrix(Mat4(1.0f));
                 SetModelViewMatrix(Mat4(1.0f));
 
+                // NOTE: Turn off vsync
                 SDL_GL_SetSwapInterval(0);
             }
             else
@@ -811,7 +820,7 @@ BuildShadersFromStr(const char *VertSource, const char *FragSource)
     return Program;
 }
 
-u32
+sav_shader
 BuildBasicShader()
 {
     const char *VertSource =
@@ -821,7 +830,10 @@ BuildBasicShader()
         "layout (location = 2) in vec4 vertColor;\n"
         "out vec4 fragTexCoord;\n"
         "out vec4 fragColor;\n"
-        "uniform mat4 mvp;\n"
+        "layout (std140) uniform Matrices\n"
+        "{\n"
+        "   mat4 mvp;\n"
+        "};\n"
         "void main()\n"
         "{\n"
         "   fragTexCoord = vertTexCoord;\n"
@@ -841,7 +853,12 @@ BuildBasicShader()
         "   finalColor = fragColor * texelColor;\n"
         "}\n\0";
      
-    return BuildShadersFromStr(VertSource, FragSource);
+    u32 ShaderID = BuildShadersFromStr(VertSource, FragSource);
+
+    sav_shader Result;
+    Result.Glid = ShaderID;
+
+    return Result;
 }
 
 sav_shader
@@ -873,7 +890,7 @@ DeleteShader(sav_shader *Shader)
 void
 BeginShaderMode(sav_shader Shader)
 {
-    gGlState.CurrentShader = Shader.Glid;
+    gGlState.CurrentShader = Shader;
     UseProgram(Shader.Glid);
 }
 
@@ -881,13 +898,20 @@ void
 EndShaderMode()
 {
     gGlState.CurrentShader = gGlState.DefaultShader;
-    UseProgram(gGlState.DefaultShader);
+    UseProgram(gGlState.DefaultShader.Glid);
+}
+
+void
+SetShaderMatricesBindingPoint(sav_shader Shader, const char *UBOName)
+{
+    u32 BlockIndex = glGetUniformBlockIndex(Shader.Glid, UBOName);
+    glUniformBlockBinding(Shader.Glid, BlockIndex, gGlState.MatricesUBOBindingPoint);
 }
 
 static_i int
 GetUniformLocation(u32 Shader, const char *UniformName)
 {
-    int UniformLocation = glGetUniformLocation(gGlState.CurrentShader, UniformName);
+    int UniformLocation = glGetUniformLocation(gGlState.CurrentShader.Glid, UniformName);
 
     #ifdef SAV_DEBUG
     if (UniformLocation == -1)
@@ -904,28 +928,28 @@ GetUniformLocation(u32 Shader, const char *UniformName)
 void
 SetUniformMat4(const char *UniformName, f32 *Value)
 {
-    int UniformLocation = GetUniformLocation(gGlState.CurrentShader, UniformName);
+    int UniformLocation = GetUniformLocation(gGlState.CurrentShader.Glid, UniformName);
     glUniformMatrix4fv(UniformLocation, 1, false, Value);
 }
 
 void
 SetUniformVec3(const char *UniformName, f32 *Value)
 {
-    int UniformLocation = GetUniformLocation(gGlState.CurrentShader, UniformName);
+    int UniformLocation = GetUniformLocation(gGlState.CurrentShader.Glid, UniformName);
     glUniform3fv(UniformLocation, 1, Value);
 }
 
 void
 SetUniformVec4(const char *UniformName, f32 *Value)
 {
-    int UniformLocation = GetUniformLocation(gGlState.CurrentShader, UniformName);
+    int UniformLocation = GetUniformLocation(gGlState.CurrentShader.Glid, UniformName);
     glUniform4fv(UniformLocation, 1, Value);
 }
 
 void
 SetUniformI(const char *UniformName, int Value)
 {
-    int UniformLocation = GetUniformLocation(gGlState.CurrentShader, UniformName);
+    int UniformLocation = GetUniformLocation(gGlState.CurrentShader.Glid, UniformName);
     glUniform1i(UniformLocation, Value);
 }
 
@@ -972,7 +996,8 @@ EndDraw()
 }
 
 void
-PrepareGpuData(u32 *VBO, u32 *VAO, u32 *EBO, int MaxVertCount, int MaxIndexCount)
+PrepareGpuData(u32 *VBO, u32 *VAO, u32 *EBO, int MaxVertCount, int MaxIndexCount,
+               u32 *MatricesUBO, u32 MatricesUBOBindingPoint)
 {
     size_t BytesPerVertex = (3 + 4 + 4) * sizeof(float);
     
@@ -982,7 +1007,7 @@ PrepareGpuData(u32 *VBO, u32 *VAO, u32 *EBO, int MaxVertCount, int MaxIndexCount
     glGenBuffers(1, VBO);
     Assert(*VBO);
     glBindBuffer(GL_ARRAY_BUFFER, *VBO);
-    glBufferData(GL_ARRAY_BUFFER, MaxVertCount * BytesPerVertex, 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, MaxVertCount * BytesPerVertex, NULL, GL_DYNAMIC_DRAW);
 
     glBindVertexArray(*VAO);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), 0);
@@ -995,12 +1020,20 @@ PrepareGpuData(u32 *VBO, u32 *VAO, u32 *EBO, int MaxVertCount, int MaxIndexCount
     glGenBuffers(1, EBO);
     Assert(*EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MaxIndexCount * sizeof(u32), 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MaxIndexCount * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
+    size_t MatricesUBOSize = sizeof(mat4);
+    glGenBuffers(1, MatricesUBO);
+    Assert(*MatricesUBO);
+    glBindBuffer(GL_UNIFORM_BUFFER, *MatricesUBO);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(mat4), NULL, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+    glBindBufferBase(GL_UNIFORM_BUFFER, MatricesUBOBindingPoint, *MatricesUBO);
 }
 
 void
@@ -1134,7 +1167,10 @@ SetProjectionMatrix(mat4 Projection)
     gl_state *GlState = &gGlState;
     GlState->Projection = Projection;
     mat4 MVP = GlState->Projection * GlState->ModelView;
-    SetUniformMat4("mvp", &MVP.E[0][0]);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, GlState->MatricesUBO);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &MVP);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 void
@@ -1143,7 +1179,10 @@ SetModelViewMatrix(mat4 ModelView)
     gl_state *GlState = &gGlState;
     GlState->ModelView = ModelView;
     mat4 MVP = GlState->Projection * GlState->ModelView;
-    SetUniformMat4("mvp", &MVP.E[0][0]);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, GlState->MatricesUBO);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &MVP);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 vec2

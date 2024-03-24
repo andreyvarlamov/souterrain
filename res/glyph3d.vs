@@ -8,7 +8,10 @@ out vec4 fragTexCoord;
 out vec4 fragColor;
 out vec3 fragPos;
 
-uniform mat4 mvp;
+layout (std140) uniform Matrices
+{
+    mat4 mvp;
+};
 
 void main()
 {

@@ -7,7 +7,10 @@ layout (location = 2) in vec4 vertColor;
 out vec4 fragTexCoord;
 out vec4 fragColor;
 
-uniform mat4 mvp;
+layout (std140) uniform Matrices
+{
+    mat4 mvp;
+};
 
 void main()
 {
