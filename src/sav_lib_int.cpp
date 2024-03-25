@@ -68,6 +68,8 @@ struct game_code
     void *UpdateAndRenderFunc;
 };
 
+enum { MVP_MATRIX_STACK_COUNT = 32 };
+
 struct gl_state
 {
     sav_shader DefaultShader;
@@ -81,14 +83,19 @@ struct gl_state
 
     u32 DefaultTextureGlid;
 
-    mat4 Projection;
-    mat4 ModelView;
+    mat4 ProjectionStack[MVP_MATRIX_STACK_COUNT];
+    mat4 ModelViewStack[MVP_MATRIX_STACK_COUNT];
+    int ProjectionStackCurr;
+    int ModelViewStackCurr;
 
-    b32 RenderTextureActive;
+    b32 CameraModeActive;
+    b32 ShaderModeActive;
+    b32 TextureModeActive;
+    b32 DrawModeActive;
+    b32 CanDraw;
+
     rect CurrentRenderTextureScreenRect;
     sav_render_texture CurrentRenderTexture;
-
-    b32 DrawReady;
 
     sav_shader CurrentShader;
 };

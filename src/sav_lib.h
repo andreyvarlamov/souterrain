@@ -190,9 +190,10 @@ SAV_API void DrawRect(rect Rect, color Color);
 
 SAV_API void BeginCameraMode(camera_2d *Camera);
 SAV_API void EndCameraMode();
-SAV_API void SetProjectionMatrix(mat4 Projection);
-SAV_API void SetModelViewMatrix(mat4 ModelView);
-SAV_API void SetOrthographicProjectionMatrix(f32 Left, f32 Right, f32 Bottom, f32 Top, f32 Near, f32 Far);
+SAV_API void PushProjection(mat4 Projection);
+SAV_API void PushModelView(mat4 ModelView);
+SAV_API void PopProjection();
+SAV_API void PopModelView();
 SAV_API vec2 CameraWorldToScreen(camera_2d *Camera, vec2 World);
 SAV_API vec2 CameraScreenToWorld(camera_2d *Camera, vec2 Screen);
 SAV_API vec2 CameraScreenToWorldRel(camera_2d *Camera, vec2 Screen);

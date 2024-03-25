@@ -357,9 +357,11 @@ InitWindow(const char *WindowName, int WindowWidth, int WindowHeight)
                 GlState->CurrentShader = GlState->DefaultShader;
                 UseProgram(GlState->CurrentShader.Glid);
                 SetShaderMatricesBindingPoint(GlState->DefaultShader, "Matrices");
-                
-                SetProjectionMatrix(Mat4(1.0f));
-                SetModelViewMatrix(Mat4(1.0f));
+
+                GlState->ProjectionStackCurr = -1;
+                GlState->ModelViewStackCurr = -1;
+                PushProjection(Mat4(1.0f));
+                PushModelView(Mat4(1.0f));
 
                 // NOTE: Turn off vsync
                 SDL_GL_SetSwapInterval(0);
@@ -649,7 +651,7 @@ vec2 GetMouseLogicalPos()
 {
     vec2 P = Vec2((f32) gInputState.MousePos.X, (f32) gInputState.MousePos.Y);
     gl_state *GlState = &gGlState;
-    if (GlState->RenderTextureActive)
+    if (GlState->TextureModeActive)
     {
         P = ScreenToRectCoords(GlState->CurrentRenderTextureScreenRect,
                                (f32) GlState->CurrentRenderTexture.Texture.Width,
@@ -890,15 +892,27 @@ DeleteShader(sav_shader *Shader)
 void
 BeginShaderMode(sav_shader Shader)
 {
-    gGlState.CurrentShader = Shader;
+    gl_state *GlState = &gGlState;
+
+    Assert(!GlState->ShaderModeActive);
+    
+    GlState->CurrentShader = Shader;
     UseProgram(Shader.Glid);
+
+    GlState->ShaderModeActive = true;
 }
 
 void
 EndShaderMode()
 {
-    gGlState.CurrentShader = gGlState.DefaultShader;
-    UseProgram(gGlState.DefaultShader.Glid);
+    gl_state *GlState = &gGlState;
+
+    Assert(GlState->ShaderModeActive);
+    
+    GlState->CurrentShader = GlState->DefaultShader;
+    UseProgram(GlState->DefaultShader.Glid);
+
+    GlState->ShaderModeActive = false;
 }
 
 void
@@ -978,21 +992,33 @@ ClearBackground(color Color)
 void
 BeginDraw()
 {
+    gl_state *GlState = &gGlState;
     sdl_state *SdlState = &gSdlState;
-    glViewport(0, 0, (int) SdlState->WindowSize.X, (int) SdlState->WindowSize.Y);
-    SetProjectionMatrix(Mat4GetOrthographicProjection(0.0f,
-                                                      SdlState->WindowSize.X,
-                                                      SdlState->WindowSize.Y,
-                                                      0.0f, -1.0f, 1.0f));
-    gGlState.RenderTextureActive = false;
-    gGlState.DrawReady = true;
 
+    Assert(!GlState->TextureModeActive);
+    Assert(!GlState->DrawModeActive);
+    
+    glViewport(0, 0, (int) SdlState->WindowSize.X, (int) SdlState->WindowSize.Y);
+    PushProjection(Mat4GetOrthographicProjection(0.0f,
+                                                 SdlState->WindowSize.X,
+                                                 SdlState->WindowSize.Y,
+                                                 0.0f, -1.0f, 1.0f));
+
+    GlState->DrawModeActive = true;
+    GlState->CanDraw = true;
 }
 
 void
 EndDraw()
 {
-    gGlState.DrawReady = false;
+    gl_state *GlState = &gGlState;
+
+    Assert(GlState->DrawModeActive);
+
+    PopProjection(); 
+
+    GlState->DrawModeActive = false;
+    GlState->CanDraw = false;
 }
 
 void
@@ -1041,7 +1067,7 @@ DrawVertices(vec3 *Positions, vec4 *TexCoords, vec4 *Colors, u32 *Indices, int V
 {
     gl_state *GlState = &gGlState;
 
-    Assert(GlState->DrawReady);
+    Assert(GlState->CanDraw);
     Assert(Positions);
     Assert(TexCoords);
     Assert(Colors);
@@ -1152,37 +1178,73 @@ DrawRect(rect Rect, color Color)
 void
 BeginCameraMode(camera_2d *Camera)
 {
-    SetModelViewMatrix(Mat4GetCamera2DView(Camera->Target, Camera->Zoom, Camera->Rotation, Camera->Offset));
+    Assert(!gGlState.CameraModeActive);
+    
+    PushModelView(Mat4GetCamera2DView(Camera->Target, Camera->Zoom, Camera->Rotation, Camera->Offset));
+
+    gGlState.CameraModeActive = true;
 }
 
 void
 EndCameraMode()
 {
-    SetModelViewMatrix(Mat4(1.0f));
+    Assert(gGlState.CameraModeActive);
+
+    PopModelView();
+
+    gGlState.CameraModeActive = false;
 }
 
-void
-SetProjectionMatrix(mat4 Projection)
+static_i void
+SetCurrentMVP()
 {
     gl_state *GlState = &gGlState;
-    GlState->Projection = Projection;
-    mat4 MVP = GlState->Projection * GlState->ModelView;
-
+    
+    mat4 MVP = GlState->ProjectionStack[GlState->ProjectionStackCurr] * GlState->ModelViewStack[GlState->ModelViewStackCurr];
+    
     glBindBuffer(GL_UNIFORM_BUFFER, GlState->MatricesUBO);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &MVP);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 void
-SetModelViewMatrix(mat4 ModelView)
+PushProjection(mat4 Projection)
 {
     gl_state *GlState = &gGlState;
-    GlState->ModelView = ModelView;
-    mat4 MVP = GlState->Projection * GlState->ModelView;
 
-    glBindBuffer(GL_UNIFORM_BUFFER, GlState->MatricesUBO);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(mat4), &MVP);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    Assert(GlState->ProjectionStackCurr < MVP_MATRIX_STACK_COUNT - 2);
+    GlState->ProjectionStack[++GlState->ProjectionStackCurr] = Projection;
+    SetCurrentMVP();
+}
+
+void
+PushModelView(mat4 ModelView)
+{
+    gl_state *GlState = &gGlState;
+
+    Assert(GlState->ModelViewStackCurr < MVP_MATRIX_STACK_COUNT - 2);
+    GlState->ModelViewStack[++GlState->ModelViewStackCurr] = ModelView;
+    SetCurrentMVP();
+}
+
+void
+PopProjection()
+{
+    gl_state *GlState = &gGlState;
+
+    Assert(GlState->ProjectionStackCurr > 0);
+    --GlState->ProjectionStackCurr;
+    SetCurrentMVP();
+}
+
+void
+PopModelView()
+{
+    gl_state *GlState = &gGlState;
+
+    Assert(GlState->ModelViewStackCurr > 0);
+    --GlState->ModelViewStackCurr;
+    SetCurrentMVP();
 }
 
 vec2
@@ -1564,25 +1626,34 @@ SavDeleteRenderTexture(sav_render_texture *RenderTexture)
 void
 BeginTextureMode(sav_render_texture RenderTexture, rect RenderTextureScreenRect)
 {
+    gl_state *GlState = &gGlState;
+
+    Assert(!GlState->TextureModeActive);
+    Assert(!GlState->DrawModeActive);
+    
     glBindFramebuffer(GL_FRAMEBUFFER, RenderTexture.FBO);
     glViewport(0, 0, RenderTexture.Texture.Width, RenderTexture.Texture.Height);
-    SetProjectionMatrix(Mat4GetOrthographicProjection(0.0f,
-                                                      (f32) RenderTexture.Texture.Width,
-                                                      (f32) RenderTexture.Texture.Height,
-                                                      0.0f, -1.0f, 1.0f));
-    gl_state *GlState = &gGlState;
-    GlState->RenderTextureActive = true;
+    PushProjection(Mat4GetOrthographicProjection(0.0f,
+                                                       (f32) RenderTexture.Texture.Width,
+                                                       (f32) RenderTexture.Texture.Height,
+                                                       0.0f, -1.0f, 1.0f));
+    GlState->TextureModeActive = true;
     GlState->CurrentRenderTextureScreenRect = RenderTextureScreenRect;
     GlState->CurrentRenderTexture = RenderTexture;
-    GlState->DrawReady = true;
+    GlState->CanDraw = true;
 }
 
 void
 EndTextureMode()
 {
+    gl_state *GlState = &gGlState;
+
+    Assert(GlState->TextureModeActive);
+
+    PopProjection(); 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    gGlState.RenderTextureActive = false;
-    gGlState.DrawReady = false;
+    GlState->TextureModeActive = false;
+    GlState->CanDraw = false;
 }
 
 // SECTION: Fonts and text rendering

@@ -775,18 +775,14 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->GroundShader = BuildCustomShader("res/ground.vs", "res/ground.fs");
         SetShaderMatricesBindingPoint(GameState->GroundShader, "Matrices");
         BeginShaderMode(GameState->GroundShader);
-        {
             SetUniformI("sprite", 1);
             SetUniformI("vig", 2);
-        }
         EndShaderMode();
         GameState->Glyph3DShader = BuildCustomShader("res/glyph3d.vs", "res/glyph3d.fs");
         SetShaderMatricesBindingPoint(GameState->Glyph3DShader, "Matrices");
         BeginShaderMode(GameState->Glyph3DShader);
-        {
             SetUniformI("diffuse", 1);
             SetUniformI("normal", 2);
-        }
         EndShaderMode();
 
         // NOTE: Fonts
@@ -844,7 +840,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->Camera.Target = GetPxPFromTileP(GameState->World, GameState->World->PlayerEntity->Pos);
 
         // NOTE: Misc
-        PlayMusicStream(GameState->BackgroundMusic);
+        // PlayMusicStream(GameState->BackgroundMusic);
 
         GameState->IsInitialized = true;
     }
@@ -853,19 +849,17 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     {
         DeleteShader(&GameState->GroundShader);
         GameState->GroundShader = BuildCustomShader("res/ground.vs", "res/ground.fs");
+        SetShaderMatricesBindingPoint(GameState->GroundShader, "Matrices");
         BeginShaderMode(GameState->GroundShader);
-        {
             SetUniformI("sprite", 1);
             SetUniformI("vig", 2);
-        }
         EndShaderMode();
         DeleteShader(&GameState->Glyph3DShader);
         GameState->Glyph3DShader = BuildCustomShader("res/glyph3d.vs", "res/glyph3d.fs");
+        SetShaderMatricesBindingPoint(GameState->Glyph3DShader, "Matrices");
         BeginShaderMode(GameState->Glyph3DShader);
-        {
             SetUniformI("diffuse", 1);
             SetUniformI("normal", 2);
-        }
         EndShaderMode();
     }
 
@@ -1000,7 +994,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     Assert(ValidateEntitySpatialPartition(GameState->World));
 
     BeginDraw();
-    {
         // NOTE: Draw overlay render textures: lighting, debug, UI
         glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
         glBlendFuncSeparate(GL_DST_COLOR, GL_ZERO, GL_ONE, GL_ZERO);
@@ -1011,7 +1004,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         DrawTexture(GameState->DebugOverlay.Texture, Rect(GetWindowSize()), VA_WHITE);
 
         DrawTexture(GameState->UiRenderTex.Texture, GameState->UiRect, VA_WHITE);
-    }
     EndDraw();
 
     SavSwapBuffers();
