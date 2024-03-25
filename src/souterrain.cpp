@@ -70,189 +70,169 @@ DrawGround(game_state *GameState, world *World, memory_arena *ScratchArena)
     glEnable(GL_STENCIL_TEST);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
-    BeginDraw();
+    glStencilMask(0xFF);
+
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+    for (int GroundVariant = 1; GroundVariant <= 3; GroundVariant++)
     {
-        BeginCameraMode(&GameState->Camera);
+        MemoryArena_Freeze(ScratchArena);
+                
+        int TileCount = World->Width * World->Height;
+        vec3 *VertPositions = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec3);
+        vec4 *VertTexCoords = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec4);
+        vec4 *VertColors = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec4);
+        int CurrentVert = 0;
+        u32 *VertIndices = MemoryArena_PushArray(ScratchArena, TileCount * 6, u32);
+        int CurrentIndex = 0;
+
+        for (int WorldI = 0; WorldI < World->Width * World->Height; WorldI++)
         {
-            glStencilMask(0xFF);
-
-            
-            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-
-            for (int GroundVariant = 1; GroundVariant <= 3; GroundVariant++)
-            {
-                MemoryArena_Freeze(ScratchArena);
-                
-                int TileCount = World->Width * World->Height;
-                vec3 *VertPositions = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec3);
-                vec4 *VertTexCoords = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec4);
-                vec4 *VertColors = MemoryArena_PushArray(ScratchArena, TileCount * 4, vec4);
-                int CurrentVert = 0;
-                u32 *VertIndices = MemoryArena_PushArray(ScratchArena, TileCount * 6, u32);
-                int CurrentIndex = 0;
-
-                for (int WorldI = 0; WorldI < World->Width * World->Height; WorldI++)
-                {
-                    b32 TileInitialized = World->TilesInitialized[WorldI];
-                    u8 DarknessLevel = World->DarknessLevels[WorldI];
-                    if (!TileInitialized || DarknessLevel == DARKNESS_UNSEEN) continue;
+            b32 TileInitialized = World->TilesInitialized[WorldI];
+            u8 DarknessLevel = World->DarknessLevels[WorldI];
+            if (!TileInitialized || DarknessLevel == DARKNESS_UNSEEN) continue;
                     
-                    switch (World->Tiles[WorldI])
-                    {
-                        case TILE_GRASS:
-                        {
-                            if (GroundVariant != 1) continue;
-                        } break;
-
-                        case TILE_WATER:
-                        {
-                            if (GroundVariant != 3) continue;
-                        } break;
-                        
-                        case TILE_STONE:
-                        default:
-                        {
-                            if (GroundVariant != 2) continue;
-                        } break;
-                    }
-                        
-                    vec2i WorldP = IdxToXY(WorldI, World->Width);
-                    rect Dest = GetWorldDestRect(World, WorldP);
-
-                    vec3 Positions[4];
-                    RectGetPoints(Dest, Positions);
-                    u32 Indices[] = { 0, 1, 2, 2, 3, 0 };
-
-                    int BaseVert = CurrentVert;
-
-                    for (int i = 0; i < ArrayCount(Positions); i++)
-                    {
-                        VertPositions[CurrentVert++] = Positions[i];
-                    }
-                
-                    for (int i = 0; i < ArrayCount(Indices); i++)
-                    {
-                        VertIndices[CurrentIndex++] = Indices[i] + BaseVert;
-                    }
-                }
-
-                glStencilFunc(GL_ALWAYS, GroundVariant, 0xFF);
-
-                if (CurrentVert > 0 && CurrentIndex > 0)
+            switch (World->Tiles[WorldI])
+            {
+                case TILE_GRASS:
                 {
-                    DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
+                    if (GroundVariant != 1) continue;
+                } break;
+
+                case TILE_WATER:
+                {
+                    if (GroundVariant != 3) continue;
+                } break;
+                        
+                case TILE_STONE:
+                default:
+                {
+                    if (GroundVariant != 2) continue;
+                } break;
+            }
+                        
+            vec2i WorldP = IdxToXY(WorldI, World->Width);
+            rect Dest = GetWorldDestRect(World, WorldP);
+
+            vec3 Positions[4];
+            RectGetPoints(Dest, Positions);
+            u32 Indices[] = { 0, 1, 2, 2, 3, 0 };
+
+            int BaseVert = CurrentVert;
+
+            for (int i = 0; i < ArrayCount(Positions); i++)
+            {
+                VertPositions[CurrentVert++] = Positions[i];
+            }
+                
+            for (int i = 0; i < ArrayCount(Indices); i++)
+            {
+                VertIndices[CurrentIndex++] = Indices[i] + BaseVert;
+            }
+        }
+
+        glStencilFunc(GL_ALWAYS, GroundVariant, 0xFF);
+
+        if (CurrentVert > 0 && CurrentIndex > 0)
+        {
+            DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
+        }
+
+        MemoryArena_Unfreeze(ScratchArena);
+    }
+
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+    BeginShaderMode(GameState->GroundShader); {
+        glStencilMask(0x00);
+        
+        BindTextureSlot(1, GameState->GroundBrushTex);
+        BindTextureSlot(2, GameState->VigTex);
+                
+        for (int GroundVariant = 1; GroundVariant <= 3; GroundVariant++)
+        {
+            glStencilFunc(GL_EQUAL, GroundVariant, 0xFF);
+
+            MemoryArena_Freeze(ScratchArena);
+                    
+            vec3 *VertPositions = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec3);
+            vec4 *VertTexCoords = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec4);
+            vec4 *VertColors = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec4);
+            vec4 C = ColorV4(VA_WHITE);
+            for (int VertColorI = 0; VertColorI < World->GroundSplatCount * 4; VertColorI++)
+            {
+                VertColors[VertColorI] = C;
+            }
+            int CurrentVert = 0;
+            u32 *VertIndices = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 6, u32);
+            int CurrentIndex = 0;
+
+            ground_splat *GroundSplat = World->GroundSplats;
+            for (int SplatI = 0; SplatI < World->GroundSplatCount; SplatI++, GroundSplat++)
+            {
+                vec2 P = GroundSplat->Position;
+                        
+                rect Dest = Rect(P.X, P.Y,
+                                 GameState->GroundBrushRect.Width * GroundSplat->Scale,
+                                 GameState->GroundBrushRect.Height * GroundSplat->Scale);
+                Dest.X -= Dest.Width / 2.0f;
+                Dest.Y -= Dest.Height / 2.0f;
+    
+                vec3 Positions[4];
+                RectGetPoints(Dest, Positions);
+    
+                vec2 TexCoords[4];
+                rect Source = Rect(0.0f, (GroundVariant-1) * GameState->GroundBrushRect.Height,
+                                   GameState->GroundBrushRect.Width, GameState->GroundBrushRect.Height);
+                RectGetPoints(Source, TexCoords);
+                Rotate4PointsAroundOrigin(TexCoords, RectGetMid(Source), GroundSplat->Rotation);
+                NormalizeTexCoords(GameState->GroundBrushTex, TexCoords);
+                FlipTexCoords(TexCoords);
+
+                vec2 VigTexCoords[4];
+                rect VigSource = Rect(GameState->VigTex.Width, GameState->VigTex.Height);
+                RectGetPoints(VigSource, VigTexCoords);
+                NormalizeTexCoords(GameState->VigTex, VigTexCoords);
+                FlipTexCoords(VigTexCoords);
+
+                vec4 TexCoordsV4[4];
+                for (int i = 0; i < ArrayCount(TexCoords); i++)
+                {
+                    TexCoordsV4[i] = Vec4(TexCoords[i].X, TexCoords[i].Y, VigTexCoords[i].X, VigTexCoords[i].Y);
                 }
 
-                MemoryArena_Unfreeze(ScratchArena);
+                u32 Indices[] = { 0, 1, 2, 2, 3, 0 };
+
+                int BaseVert = CurrentVert;
+
+                for (int i = 0; i < ArrayCount(Positions); i++)
+                {
+                    VertPositions[CurrentVert] = Positions[i];
+                    VertTexCoords[CurrentVert] = TexCoordsV4[i];
+                    CurrentVert++;
+                }
+                
+                for (int i = 0; i < ArrayCount(Indices); i++)
+                {
+                    VertIndices[CurrentIndex++] = Indices[i] + BaseVert;
+                }
             }
 
-            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
+
+            MemoryArena_Unfreeze(ScratchArena);
         }
-        EndCameraMode();
-    }
-    EndDraw();
 
-    BeginShaderMode(GameState->GroundShader);
-    {
-        BeginDraw();
-        {
-            BeginCameraMode(&GameState->Camera);
-            {
-                glStencilMask(0x00);
-                
-                BindTextureSlot(1, GameState->GroundBrushTex);
-                BindTextureSlot(2, GameState->VigTex);
-                
-                for (int GroundVariant = 1; GroundVariant <= 3; GroundVariant++)
-                {
-                    glStencilFunc(GL_EQUAL, GroundVariant, 0xFF);
-
-                    MemoryArena_Freeze(ScratchArena);
-                    
-                    vec3 *VertPositions = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec3);
-                    vec4 *VertTexCoords = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec4);
-                    vec4 *VertColors = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 4, vec4);
-                    vec4 C = ColorV4(VA_WHITE);
-                    for (int VertColorI = 0; VertColorI < World->GroundSplatCount * 4; VertColorI++)
-                    {
-                        VertColors[VertColorI] = C;
-                    }
-                    int CurrentVert = 0;
-                    u32 *VertIndices = MemoryArena_PushArray(ScratchArena, World->GroundSplatCount * 6, u32);
-                    int CurrentIndex = 0;
-
-                    ground_splat *GroundSplat = World->GroundSplats;
-                    for (int SplatI = 0; SplatI < World->GroundSplatCount; SplatI++, GroundSplat++)
-                    {
-                        vec2 P = GroundSplat->Position;
-                        
-                        rect Dest = Rect(P.X, P.Y,
-                                         GameState->GroundBrushRect.Width * GroundSplat->Scale,
-                                         GameState->GroundBrushRect.Height * GroundSplat->Scale);
-                        Dest.X -= Dest.Width / 2.0f;
-                        Dest.Y -= Dest.Height / 2.0f;
+        glStencilMask(0xFF);
+        glDisable(GL_STENCIL_TEST);
     
-                        vec3 Positions[4];
-                        RectGetPoints(Dest, Positions);
-    
-                        vec2 TexCoords[4];
-                        rect Source = Rect(0.0f, (GroundVariant-1) * GameState->GroundBrushRect.Height,
-                                           GameState->GroundBrushRect.Width, GameState->GroundBrushRect.Height);
-                        RectGetPoints(Source, TexCoords);
-                        Rotate4PointsAroundOrigin(TexCoords, RectGetMid(Source), GroundSplat->Rotation);
-                        NormalizeTexCoords(GameState->GroundBrushTex, TexCoords);
-                        FlipTexCoords(TexCoords);
-
-                        vec2 VigTexCoords[4];
-                        rect VigSource = Rect(GameState->VigTex.Width, GameState->VigTex.Height);
-                        RectGetPoints(VigSource, VigTexCoords);
-                        NormalizeTexCoords(GameState->VigTex, VigTexCoords);
-                        FlipTexCoords(VigTexCoords);
-
-                        vec4 TexCoordsV4[4];
-                        for (int i = 0; i < ArrayCount(TexCoords); i++)
-                        {
-                            TexCoordsV4[i] = Vec4(TexCoords[i].X, TexCoords[i].Y, VigTexCoords[i].X, VigTexCoords[i].Y);
-                        }
-
-                        u32 Indices[] = { 0, 1, 2, 2, 3, 0 };
-
-                        int BaseVert = CurrentVert;
-
-                        for (int i = 0; i < ArrayCount(Positions); i++)
-                        {
-                            VertPositions[CurrentVert] = Positions[i];
-                            VertTexCoords[CurrentVert] = TexCoordsV4[i];
-                            CurrentVert++;
-                        }
-                
-                        for (int i = 0; i < ArrayCount(Indices); i++)
-                        {
-                            VertIndices[CurrentIndex++] = Indices[i] + BaseVert;
-                        }
-                    }
-
-                    DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
-
-                    MemoryArena_Unfreeze(ScratchArena);
-                }
-
-                glStencilMask(0xFF); // NOTE: So that stencil mask can be cleared glClear
-            }
-            EndCameraMode();
-        }
-        EndDraw();
-    }
-    EndShaderMode();
-
-    glDisable(GL_STENCIL_TEST);
+    } EndShaderMode();
 }
 
 void
 DrawLighting(game_state *GameState)
 {
-    BeginTextureMode(GameState->LightingRenderTex, Rect(0)); BeginCameraMode(&GameState->Camera); 
-    {
+    BeginTextureMode(GameState->LightingRenderTex, Rect(0)); {
         MemoryArena_Freeze(&GameState->ScratchArenaA);
         
         int TileCount = GameState->World->Width * GameState->World->Height;
@@ -299,8 +279,7 @@ DrawLighting(game_state *GameState)
         }
 
         MemoryArena_Unfreeze(&GameState->ScratchArenaA);
-    }
-    EndCameraMode(); EndTextureMode();
+    } EndTextureMode();
 }
 
 void
@@ -308,119 +287,112 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
 {
     static_i b32 WillDrawRoomGround = false;
 
-    // if (KeyPressed(SDL_SCANCODE_G))
-    // {
-    //     WillDrawRoomGround = !WillDrawRoomGround;
-    // }
-    
-    BeginShaderMode(GameState->Glyph3DShader); BeginDraw();
-    {
+    BeginShaderMode(GameState->Glyph3DShader); {
         SetUniformVec3("lightPos", &LightPosition.E[0]);
         
         // NOTE: Draw entities
-        BeginCameraMode(&GameState->Camera);
+        MemoryArena_Freeze(&GameState->ScratchArenaA);
+
+        int TileCount = GameState->World->Width * GameState->World->Height;
+        vec3 *VertPositions = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec3);
+        vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
+        vec4 *VertColors = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
+        int CurrentVert = 0;
+        u32 *VertIndices = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 6, u32);
+        int CurrentIndex = 0;
+
+        for (int WorldI = 0; WorldI < TileCount; WorldI++)
         {
-            MemoryArena_Freeze(&GameState->ScratchArenaA);
-
-            int TileCount = GameState->World->Width * GameState->World->Height;
-            vec3 *VertPositions = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec3);
-            vec4 *VertTexCoords = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
-            vec4 *VertColors = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 4, vec4);
-            int CurrentVert = 0;
-            u32 *VertIndices = MemoryArena_PushArray(&GameState->ScratchArenaA, TileCount * 6, u32);
-            int CurrentIndex = 0;
-
-            for (int WorldI = 0; WorldI < TileCount; WorldI++)
+            u8 DarknessLevel = GameState->World->DarknessLevels[WorldI];
+            if (DarknessLevel != DARKNESS_UNSEEN)
             {
-                u8 DarknessLevel = GameState->World->DarknessLevels[WorldI];
-                if (DarknessLevel != DARKNESS_UNSEEN)
+                entity *Entity = GameState->World->SpatialEntities[WorldI];
+
+                entity *EntityCursor = Entity;
+                while (EntityCursor)
                 {
-                    entity *Entity = GameState->World->SpatialEntities[WorldI];
-
-                    entity *EntityCursor = Entity;
-                    while (EntityCursor)
+                    if (EntityCursor->Type == ENTITY_NPC || EntityCursor->Type == ENTITY_PLAYER)
                     {
-                        if (EntityCursor->Type == ENTITY_NPC || EntityCursor->Type == ENTITY_PLAYER)
-                        {
-                            Entity  = EntityCursor;
-                            break;
-                        }
-                        else if (Entity->Type != ENTITY_ITEM_PICKUP && EntityCursor->Type == ENTITY_ITEM_PICKUP)
-                        {
-                            Entity = EntityCursor;
-                        }
-
-                        EntityCursor = EntityCursor->Next;
+                        Entity  = EntityCursor;
+                        break;
                     }
-                    
-                    if (Entity)
+                    else if (Entity->Type != ENTITY_ITEM_PICKUP && EntityCursor->Type == ENTITY_ITEM_PICKUP)
                     {
-                        if (DarknessLevel == DARKNESS_IN_VIEW || (Entity->Type != ENTITY_NPC))
+                        Entity = EntityCursor;
+                    }
+
+                    EntityCursor = EntityCursor->Next;
+                }
+                    
+                if (Entity)
+                {
+                    if (DarknessLevel == DARKNESS_IN_VIEW || (Entity->Type != ENTITY_NPC))
+                    {
+                        vec2i WorldP = IdxToXY(WorldI, GameState->World->Width);
+                        rect Dest = GetWorldDestRect(GameState->World, WorldP);
+                        rect Source = GetGlyphSourceRect(GameState->GlyphAtlas, Entity->Glyph);
+
+                        vec3 Positions[4];
+                        RectGetPoints(Dest, Positions);
+                        vec2 TexCoords[4];
+                        GetTexCoordsForTex(GameState->GlyphAtlas.T, Source, TexCoords);
+                        vec4 TexCoordsV4[4];
+                        for (int i = 0; i < ArrayCount(TexCoords); i++)
                         {
-                            vec2i WorldP = IdxToXY(WorldI, GameState->World->Width);
-                            rect Dest = GetWorldDestRect(GameState->World, WorldP);
-                            rect Source = GetGlyphSourceRect(GameState->GlyphAtlas, Entity->Glyph);
+                            TexCoordsV4[i] = Vec4(TexCoords[i], 0, 0);
+                        }
+                        vec4 ColV = ColorV4(Entity->Color);
 
-                            vec3 Positions[4];
-                            RectGetPoints(Dest, Positions);
-                            vec2 TexCoords[4];
-                            GetTexCoordsForTex(GameState->GlyphAtlas.T, Source, TexCoords);
-                            vec4 TexCoordsV4[4];
-                            for (int i = 0; i < ArrayCount(TexCoords); i++)
-                            {
-                                TexCoordsV4[i] = Vec4(TexCoords[i], 0, 0);
-                            }
-                            vec4 ColV = ColorV4(Entity->Color);
+                        int BaseVert = CurrentVert;
+                        for (int i = 0; i < ArrayCount(Positions); i++)
+                        {
+                            VertPositions[CurrentVert] = Positions[i];
+                            VertTexCoords[CurrentVert] = TexCoordsV4[i];
+                            VertColors[CurrentVert] = ColV;
+                            CurrentVert++;
+                        }
 
-                            int BaseVert = CurrentVert;
-                            for (int i = 0; i < ArrayCount(Positions); i++)
-                            {
-                                VertPositions[CurrentVert] = Positions[i];
-                                VertTexCoords[CurrentVert] = TexCoordsV4[i];
-                                VertColors[CurrentVert] = ColV;
-                                CurrentVert++;
-                            }
-
-                            u32 Indices[] = { 0, 1, 2, 2, 3, 0 };
+                        u32 Indices[] = { 0, 1, 2, 2, 3, 0 };
                 
-                            for (int i = 0; i < ArrayCount(Indices); i++)
-                            {
-                                VertIndices[CurrentIndex++] = Indices[i] + BaseVert;
-                            }
+                        for (int i = 0; i < ArrayCount(Indices); i++)
+                        {
+                            VertIndices[CurrentIndex++] = Indices[i] + BaseVert;
                         }
                     }
                 }
             }
-
-            if (CurrentVert > 0 && CurrentIndex > 0)
-            {
-                BindTextureSlot(1, GameState->GlyphAtlas.T);
-                BindTextureSlot(2, GameState->GlyphAtlasNormalTex);
-
-                DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
-            }
-
-            MemoryArena_Unfreeze(&GameState->ScratchArenaA);
         }
-        EndCameraMode();
-    }
-    EndShaderMode(); EndDraw();
+
+        if (CurrentVert > 0 && CurrentIndex > 0)
+        {
+            BindTextureSlot(1, GameState->GlyphAtlas.T);
+            BindTextureSlot(2, GameState->GlyphAtlasNormalTex);
+
+            DrawVertices(VertPositions, VertTexCoords, VertColors, VertIndices, CurrentVert, CurrentIndex);
+        }
+
+        MemoryArena_Unfreeze(&GameState->ScratchArenaA);
+    } EndShaderMode();
 }
 
 void
 DrawGame(game_state *GameState, world *World)
 {
-    game_input *GameInput = &GameState->GameInput;
-    DrawGround(GameState, World, &GameState->ScratchArenaA);
+    BeginDraw();
+    BeginCameraMode(&GameState->Camera); {
+        game_input *GameInput = &GameState->GameInput;
+        DrawGround(GameState, World, &GameState->ScratchArenaA);
 
-    f32 LightHeight = 150.0f;
-    f32 MaxAwayFromCenter = 50.0f;
-    vec2 ScreenCenter = CameraScreenToWorld(&GameState->Camera, GetWindowSize() * 0.5f);
-    vec2 LightOffset = GameInput->MouseWorldPxP - ScreenCenter;
-    LightOffset = (VecLengthSq(LightOffset) > Square(MaxAwayFromCenter) ?
-                   VecNormalize(LightOffset) * MaxAwayFromCenter :
-                   LightOffset);
-    DrawEntities(GameState, Vec3(ScreenCenter + LightOffset, LightHeight));
+        f32 LightHeight = 150.0f;
+        f32 MaxAwayFromCenter = 50.0f;
+        vec2 ScreenCenter = CameraScreenToWorld(&GameState->Camera, GetWindowSize() * 0.5f);
+        vec2 LightOffset = GameInput->MouseWorldPxP - ScreenCenter;
+        LightOffset = (VecLengthSq(LightOffset) > Square(MaxAwayFromCenter) ?
+                       VecNormalize(LightOffset) * MaxAwayFromCenter :
+                       LightOffset);
+        DrawEntities(GameState, Vec3(ScreenCenter + LightOffset, LightHeight));
+    } EndCameraMode();
+    EndDraw();
 
     DrawLighting(GameState);
 }
@@ -607,6 +579,7 @@ EndUIDraw()
 void
 ClearBuffers(game_state *GameState)
 {
+    // TODO: Need special clear functions in sav that would do this more efficiently
     BeginDraw();
     ClearBackground(VA_BLACK);
     EndDraw();
