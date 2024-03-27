@@ -32,7 +32,7 @@ enum entity_type
     ENTITY_TYPE_COUNT
 };
 
-enum npc_state
+enum npc_state : u8
 {
     NPC_STATE_NONE = 0,
     NPC_STATE_IDLE,
