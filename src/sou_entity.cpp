@@ -242,6 +242,18 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity)
         Entity->Level = 1;
     }
 
+    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
+    {
+        Entity->HealthData.Blood.Current = Entity->HealthData.Blood.Max = 100.0f;
+        Entity->HealthData.Head.Current = Entity->HealthData.Head.Max = 100.0f;
+        Entity->HealthData.Chest.Current = Entity->HealthData.Chest.Max = 100.0f;
+        Entity->HealthData.Stomach.Current = Entity->HealthData.Stomach.Max = 100.0f;
+        Entity->HealthData.LeftArm.Current = Entity->HealthData.LeftArm.Max = 100.0f;
+        Entity->HealthData.RightArm.Current = Entity->HealthData.RightArm.Max = 100.0f;
+        Entity->HealthData.LeftLeg.Current = Entity->HealthData.LeftLeg.Max = 100.0f;
+        Entity->HealthData.RightLeg.Current = Entity->HealthData.RightLeg.Max = 100.0f;
+    }
+
     AddEntityToSpatial(World, Pos, Entity);
 
     if (Entity->ActionCost > 0)

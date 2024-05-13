@@ -74,6 +74,24 @@ struct item
     int RangedDamage;
 };
 
+struct health_stat
+{
+    f32 Current;
+    f32 Max;
+};
+
+struct health_data
+{
+    health_stat Blood;
+    health_stat Head;
+    health_stat Chest;
+    health_stat Stomach;
+    health_stat LeftArm;
+    health_stat RightArm;
+    health_stat LeftLeg;
+    health_stat RightLeg;
+};
+
 struct entity
 {
     u8 Type;
@@ -98,6 +116,8 @@ struct entity
 
     const char *Name;
     const char *Description;
+
+    health_data HealthData;
 
     int Health;
     int MaxHealth;

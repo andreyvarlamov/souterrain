@@ -474,9 +474,73 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
 
     LineX += PortraitWidth + PaddingX;
 
-    f32 LineHeight = 45.0f;
+    f32 LineHeight = 38.0f;
     f32 MaxWidth = 180.0f;
 
+    DrawString(TextFormat("Blood: %.0f/%.0f", Player->HealthData.Blood.Current, Player->HealthData.Blood.Max),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Chest: %.0f/%.0f", Player->HealthData.Chest.Current, Player->HealthData.Chest.Max),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Stomach: %.0f/%.0f", Player->HealthData.Stomach.Current, Player->HealthData.Stomach.Max),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Left Arm: %.0f/%.0f", Player->HealthData.LeftArm.Current, Player->HealthData.LeftArm.Max),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Right Arm: %.0f/%.0f", Player->HealthData.RightArm.Current, Player->HealthData.RightArm.Max),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Left Leg: %.0f/%.0f", Player->HealthData.LeftLeg.Current, Player->HealthData.LeftLeg.Max),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+    DrawString(TextFormat("Right Leg: %.0f/%.0f", Player->HealthData.RightLeg.Current, Player->HealthData.RightLeg.Max),
+               GameState->TitleFont,
+               GameState->TitleFont->PointSize,
+               LineX, LineY, 0,
+               VA_WHITE,
+               false, VA_BLACK,
+               &GameState->ScratchArenaA);
+    LineY += LineHeight;
+
+#if false
     DrawString(TextFormat("AC: %d", Player->ArmorClass),
                GameState->TitleFont,
                GameState->TitleFont->PointSize,
@@ -560,6 +624,7 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
                false, VA_BLACK,
                &GameState->ScratchArenaA);
     LineY += LineHeight;
+#endif
 }
 
 inline void
@@ -880,7 +945,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     {
         case RUN_STATE_NONE:
         {
-            GameState->RunState = RUN_STATE_MAIN_MENU;
+            GameState->RunState = RUN_STATE_LOAD_WORLD;
         } break;
 
         case RUN_STATE_MAIN_MENU:
