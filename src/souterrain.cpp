@@ -741,9 +741,6 @@ ProcessPlayerFOV(world *World, b32 IgnoreFieldOfView)
     }
 }
 
-#include "sou_rs_main_menu.cpp"
-#include "sou_rs_in_game.cpp"
-
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
 {
@@ -865,20 +862,10 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     }
 
 #ifdef SAV_DEBUG
-#if 0
     if (KeyPressed(SDL_SCANCODE_B))
     {
         Breakpoint;
-
-        entity **DebugEntities;
-        int Count;
-        GetAllEntitiesOfType(ENTITY_ITEM_PICKUP, World, &GameState->ScratchArenaA, &DebugEntities, &Count);
-
-        GetAllEntitiesOfType(ENTITY_NPC, World, &GameState->ScratchArenaA, &DebugEntities, &Count);
-
-        Noop;
     }
-#endif
 #endif
 
     // SECTION: GAME LOGIC UPDATE
@@ -893,11 +880,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             GameState->RunState = RUN_STATE_IN_GAME;
         } break;
 
-        case RUN_STATE_MAIN_MENU:
-        {
-            GameState->RunState = RunState_MainMenu(GameState);
-        } break;
-
         case RUN_STATE_IN_GAME:
         {
             game_input *GameInput = &GameState->GameInput;
@@ -905,7 +887,29 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
             if (KeyPressed(SDL_SCANCODE_F2)) GameState->ShowDebugUI = !GameState->ShowDebugUI;
 
-            GameState->RunState = RunState_InGame(GameState);
+            world *World = GameState->World;
+            entity *Player = World->PlayerEntity;
+
+            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
+            if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
+            
+            i64 StartTurn = World->CurrentTurn;
+
+            ProcessPlayerInputs(&GameState->PlayerReqAction);
+            b32 TurnUsed = UpdatePlayer(Player, World, &GameState->Camera, &GameState->PlayerReqAction, GameState);
+            if (TurnUsed)
+            {
+                ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
+            }
+            ResetPlayerInputs(&GameState->PlayerReqAction);
+
+            DrawGame(GameState, World);
+
+            BeginUIDraw(GameState);
+            DrawDebugUI(GameState, GameInput->MouseWorldTileP);
+            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
+            
+            EndUIDraw();
         } break;
 
         case RUN_STATE_QUIT:

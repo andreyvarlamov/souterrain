@@ -288,3 +288,102 @@ CopyEntity(entity *From, entity *To, world *ToWorld)
     To->Name = From->Name;
     To->Description = From->Description;
 }
+
+b32
+MoveEntity(world *World, entity *Entity, vec2i NewP, b32 ShouldAttack, b32 *Out_TurnUsed)
+{
+    *Out_TurnUsed = false;
+    
+    Assert(Entity->Type > 0);
+    
+    collision_info Col = CheckCollisions(World, NewP);
+
+    if (Col.Collided)
+    {
+        if (Col.Entity)
+        {
+            // *Out_TurnUsed = ResolveEntityCollision(Entity, Col.Entity, World, ShouldAttack);
+        }
+
+        return false;
+    }
+    else
+    {
+        RemoveEntityFromSpatial(World, Entity->Pos, Entity);
+        AddEntityToSpatial(World, NewP, Entity);
+
+        Entity->Pos = NewP;
+        
+#if 0
+        LogEntityAction(Entity, World, "%s (%d) moves without hitting anyone", Entity->Name, Entity->DebugID);
+#endif
+        
+        *Out_TurnUsed = true;
+        return true;
+    }
+}
+
+b32
+MovePlayer(world *World, entity *Player, vec2i NewP, camera_2d *Camera)
+{
+    vec2i OldP = Player->Pos;
+    b32 TurnUsed = false;
+    if (MoveEntity(World, Player, NewP, true, &TurnUsed))
+    {
+        if (IsPositionInCameraView(OldP, Camera, World))
+        {
+            Camera->Target += GetPxPFromTileP(World, Player->Pos) - GetPxPFromTileP(World, OldP);
+        }
+        else
+        {
+            Camera->Target = GetPxPFromTileP(World, Player->Pos);
+        }
+    }
+    return TurnUsed;
+}
+
+b32
+UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action, game_state *GameState)
+{
+    b32 TurnUsed = false;
+    switch (Action->T)
+    {
+        default: break;
+                    
+        case ACTION_MOVE:
+        {
+            TurnUsed = MovePlayer(World, Player, Player->Pos + Action->DP, Camera);
+        } break;
+
+        case ACTION_TELEPORT:
+        {
+            vec2i NewP;
+            int Iter = 0;
+            int MaxIters = 10;
+            b32 FoundPosition = true;
+            do
+            {
+                NewP = Vec2I(GetRandomValue(0, World->Width), GetRandomValue(0, World->Height));
+
+                if (Iter++ >= MaxIters)
+                {
+                    FoundPosition = false;
+                    break;
+                }
+            }
+            while (CheckCollisions(World, NewP).Collided);
+
+            if (FoundPosition)
+            {
+                TurnUsed = MovePlayer(World, Player, NewP, Camera);
+            }
+        } break;
+
+        case ACTION_SKIP_TURN:
+        {
+            TurnUsed = true;
+        } break;
+    }
+
+    return TurnUsed;
+}

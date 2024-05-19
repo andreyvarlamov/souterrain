@@ -328,12 +328,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     entity StairsUp = Template_StairsUp();
     entity StairsDown = Template_StairsDown();
     entity Player = Template_Player();
-    entity ItemPickupTemplate = Template_ItemPickup();
     entity TestEnemy = Template_TestEnemy();
-    // entity AetherFly = Template_AetherFly();
-    // entity EtherealMartyr = Template_EtherealMartyr();
-    // entity FacelessSoul = Template_FacelessSoul();
-    // entity Crane = Template_Crane();
 #pragma endregion
 
 #pragma region GENERATE MAP
@@ -596,5 +591,3 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
 
     return World;
 }
-
-#include "sou_entity_behavior.cpp"

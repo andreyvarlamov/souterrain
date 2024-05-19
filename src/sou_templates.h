@@ -191,22 +191,6 @@ Template_StairsDown()
 ;
 #endif
 
-TEMPLATE_FUNC entity
-Template_ItemPickup()
-#ifdef TEMPLATE_EXPORTS
-{
-    entity Template = {};
-
-    Template.Type = ENTITY_ITEM_PICKUP;
-    Template.Name = "Item pickup";
-    Template.Description = "Walk over the tile and press G to view items.";
-
-    return Template;
-}
-#else
-;
-#endif
-
 //////////////////////////
 // SECTION: NPCS /////////
 //////////////////////////
