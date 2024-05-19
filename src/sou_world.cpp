@@ -277,13 +277,14 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
     }
 }
 
-#define GENERATED_MAP 1
+#define GENERATED_MAP 0
+#define ITEM_PICKUP_TEST 0
+#define TEST_ENEMY 1
 
 world *
 GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *ScratchArena)
 {
-    // SECTION: PREPARE WORLD STATE
-    
+#pragma region PREPARE WORLD STATE
     // TODO: The allocation size should depend on the world size
     // = MemoryArena_PushStructAndZero(WorldArena, world);
     memory_arena NewWorldArena = AllocArena(Megabytes(8));
@@ -312,7 +313,9 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     World->TurnQueueCount = 0;
     World->TurnQueueMax = World->EntityMaxCount;
     World->EntityTurnQueue = MemoryArena_PushArray(WorldArena, World->TurnQueueMax, entity_queue_node);
+#pragma endregion
 
+#pragma region GET TEMPLATES
     entity PumiceWall = Template_PumiceWall();
     entity Statues[] = {
         Template_LatenaStatue(),
@@ -324,8 +327,16 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     };
     entity StairsUp = Template_StairsUp();
     entity StairsDown = Template_StairsDown();
+    entity Player = Template_Player();
+    entity ItemPickupTemplate = Template_ItemPickup();
+    entity TestEnemy = Template_TestEnemy();
+    // entity AetherFly = Template_AetherFly();
+    // entity EtherealMartyr = Template_EtherealMartyr();
+    // entity FacelessSoul = Template_FacelessSoul();
+    // entity Crane = Template_Crane();
+#pragma endregion
 
-    // SECTION: GENERATE MAP
+#pragma region GENERATE MAP
 #if (GENERATED_MAP == 1)
     
     u8 *GeneratedEntityMap = MemoryArena_PushArrayAndZero(ScratchArena, World->Width * World->Height, u8);
@@ -381,10 +392,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
             default: break;
         }
     }
-
-
 #else
-
     vec2i PlayerP = Vec2I(10, 10);
 
     for (int i = 0; i < World->Width * World->Height; i++)
@@ -404,14 +412,13 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
         AddEntity(World, Vec2I(0, Y), &PumiceWall);
         AddEntity(World, Vec2I(World->Width - 1, Y), &PumiceWall);
     }
-    
 #endif
+#pragma endregion
 
-    // SECTION: ADD ENTITIES
-    entity Player = Template_Player();
+#pragma region POST GEN ENTITIES
     World->PlayerEntity = AddEntity(World, PlayerP, &Player);
 
-    entity ItemPickupTemplate = Template_ItemPickup();
+#if (ITEM_PICKUP_TEST == 1)
     entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTemplate);
 
     ItemPickupTest->Inventory[0] = Template_HaimaPotion();
@@ -428,49 +435,9 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
 
     ItemPickupTest->Glyph = ItemPickupTest->Inventory[0].Glyph;
     ItemPickupTest->Color = ItemPickupTest->Inventory[0].Color;
+#endif
 
-    entity AetherFly = Template_AetherFly();
-    entity EtherealMartyr = Template_EtherealMartyr();
-    entity FacelessSoul = Template_FacelessSoul();
-    entity Crane = Template_Crane();
-    
-#if 0
-    int EnemyCount = 0;
-    int AttemptCount = 0;
-    int EnemiesToAdd = 150;
-    int MaxAttempts = 500;
-    while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
-    {
-        int X = GetRandomValue(0, World->Width);
-        int Y = GetRandomValue(0, World->Height);
-
-        vec2i P = Vec2I(X, Y);
-        if (!CheckCollisions(World, P).Collided)
-        {
-            AddEntity(World, P, &AetherFly);
-            EnemyCount++;
-        }
-        AttemptCount++;
-    }
-#elif 0
-    int EnemyCount = 0;
-    int AttemptCount = 0;
-    int EnemiesToAdd = 0;
-    int MaxAttempts = 500;
-    while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
-    {
-        int X = GetRandomValue(World->PlayerEntity->Pos.X - 10, World->PlayerEntity->Pos.X + 10);
-        int Y = GetRandomValue(World->PlayerEntity->Pos.Y - 10, World->PlayerEntity->Pos.Y + 10);
-
-        vec2i P = Vec2I(X, Y);
-        if (!CheckCollisions(World, P).Collided)
-        {
-            AddEntity(World, P, &AetherFly);
-            EnemyCount++;
-        }
-        AttemptCount++;
-    }
-#else
+#if (GENERATED_MAP == 1)
     int EnemyCount = 0;
     {
         room *Room = GeneratedRooms;
@@ -550,15 +517,43 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
             }
         }
     }
-#endif
+#elif (TEST_ENEMY == 1)
+    int EnemyCount = 0;
+    int AttemptCount = 0;
+    int EnemiesToAdd = 1;
+    int MaxAttempts = 500;
+    while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
+    {
+        vec2i P = PlayerP + Vec2I(GetRandomValue(-5, 5), GetRandomValue(-5, 5));
+        if (!CheckCollisions(World, P).Collided)
+        {
+            AddEntity(World, P, &TestEnemy);
+            EnemyCount++;
+        }
+        AttemptCount++;
+    }
+#else
+    int EnemyCount = 0;
+    int AttemptCount = 0;
+    int EnemiesToAdd = 50;
+    int MaxAttempts = 500;
+    while (EnemyCount < EnemiesToAdd && AttemptCount < MaxAttempts)
+    {
+        int X = GetRandomValue(0, World->Width);
+        int Y = GetRandomValue(0, World->Height);
 
-#ifdef SAV_DEBUG
-    // NOTE: Signed overflow so we know which entities got added post world gen :)
-    World->EntityCurrentDebugID = INT_MAX;
-    World->EntityCurrentDebugID++;
+        vec2i P = Vec2I(X, Y);
+        if (!CheckCollisions(World, P).Collided)
+        {
+            AddEntity(World, P, &TestEnemy);
+            EnemyCount++;
+        }
+        AttemptCount++;
+    }
 #endif
+#pragma endregion
 
-    // SECTION: GENERATE GROUND SPLATS
+#pragma region GENERATE GROUND SPLATS
     // TODO: Instead of hardcoding like this, calculate scale and dist between splats based on ground brush tex size
     f32 Scale = 10.0f;
     f32 DistBwSplatsX = 135.0f;
@@ -589,6 +584,13 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
             GroundSplat->Scale = Scale;
         }
     }
+#pragma endregion
+
+#ifdef SAV_DEBUG
+    // NOTE: Signed overflow so we know which entities got added post world gen :)
+    World->EntityCurrentDebugID = INT_MAX;
+    World->EntityCurrentDebugID++;
+#endif
 
     TraceLog("Generated world. Added %d enemies.", EnemyCount);
 

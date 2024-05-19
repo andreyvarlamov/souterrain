@@ -451,7 +451,7 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
     f32 LineX = PlayerStatsRect.X + PaddingX;
     f32 LineY = TopY;
 
-    color PortraitColor = (((f32) Player->Health / (f32) Player->MaxHealth > 0.3f) ? VA_WHITE : Color(0xAE4642FF));
+    color PortraitColor = VA_WHITE;
 
     f32 PortraitWidth = 160.0f;
     f32 PortraitHeight = 160.0f;
@@ -459,7 +459,6 @@ DrawPlayerStatsUI(game_state *GameState, entity *Player, vec2 MouseWorldPxP)
     f32 PortraitY = PlayerStatsRect.Y + PlayerStatsRect.Height * 0.5f - PortraitHeight * 0.5f;
 
     DrawTexture(GameState->PlayerPortraitTex, Rect(PortraitX, PortraitY, PortraitWidth, PortraitHeight), PortraitColor);
-    if (Player->Health > 0)
     {
         vec2 PlayerPxP = Vec2(Player->Pos.X * World->TilePxW + World->TilePxW * 0.5f,
                               Player->Pos.Y * World->TilePxH + World->TilePxH * 0.5f);
@@ -742,57 +741,8 @@ ProcessPlayerFOV(world *World, b32 IgnoreFieldOfView)
     }
 }
 
-void
-DeleteDeadEntities(world *World)
-{
-    entity *Entity = World->Entities;
-    for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
-    {
-        if (EntityExists(Entity) && EntityIsDead(Entity))
-        {
-            if (Entity->ActionCost > 0)
-            {
-                EntityTurnQueueDelete(World, Entity);
-            }
-            if (Entity->Type == ENTITY_PLAYER)
-            {
-                ProcessPlayerFOV(World, true);
-            }
-            DeleteEntity(World, Entity);
-        }
-    }
-}
-
-void
-ProcessMinedWalls(world *World)
-{
-    entity *Entity = World->Entities;
-    for (int i = 0; i < World->EntityUsedCount; i++, Entity++)
-    {
-        if (Entity->Type == ENTITY_WALL && EntityIsDead(Entity))
-        {
-            vec2i EntityP = Entity->Pos;
-            for (int Dir = 0; Dir < 8; Dir++)
-            {
-                vec2i NeighborP = EntityP + DIRECTIONS[Dir];
-                if (IsPInBounds(NeighborP, World) && !IsPInitialized(NeighborP, World))
-                {
-                    InitializeP(NeighborP, World);
-                    entity WallTemplate = Template_PumiceWall();
-                    AddEntity(World, NeighborP, &WallTemplate);
-                }
-            }
-        }
-    }
-}
-
-#include "sou_inspect_ui.cpp"
 #include "sou_rs_main_menu.cpp"
 #include "sou_rs_in_game.cpp"
-#include "sou_rs_inventory.cpp"
-#include "sou_rs_pickup.cpp"
-#include "sou_rs_ranged_attack.cpp"
-#include "sou_rs_levelup.cpp"
 
 GAME_API void
 UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory) 
@@ -904,9 +854,6 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
     // SECTION: GAME LOGIC PRE UPDATE
     MemoryArena_Reset(&GameState->ScratchArenaA);
 
-    world *World = GameState->World;
-    entity *Player = World->PlayerEntity;
-
     if (WindowSizeChanged())
     {
         GameState->Camera.Offset = GetWindowSize() / 2.0f;
@@ -917,7 +864,8 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         GameState->DebugOverlay = SavLoadRenderTexture((int) GetWindowSize().X, (int) GetWindowSize().Y, false);
     }
 
-#ifdef SAV_DEBUG  
+#ifdef SAV_DEBUG
+#if 0
     if (KeyPressed(SDL_SCANCODE_B))
     {
         Breakpoint;
@@ -931,21 +879,18 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         Noop;
     }
 #endif
-
-    // SECTION: CHECK INPUTS
-    game_input *GameInput = &GameState->GameInput;
-    ProcessInputs(GameState);
-    if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
-    if (KeyPressed(SDL_SCANCODE_F2)) GameState->ShowDebugUI = !GameState->ShowDebugUI;
+#endif
 
     // SECTION: GAME LOGIC UPDATE
     ClearBuffers(GameState);
+
+    GameState->IgnoreFieldOfView = true;
 
     switch (GameState->RunState)
     {
         case RUN_STATE_NONE:
         {
-            GameState->RunState = RUN_STATE_LOAD_WORLD;
+            GameState->RunState = RUN_STATE_IN_GAME;
         } break;
 
         case RUN_STATE_MAIN_MENU:
@@ -953,68 +898,14 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
             GameState->RunState = RunState_MainMenu(GameState);
         } break;
 
-        case RUN_STATE_LOAD_WORLD:
-        {
-            Assert(GameState->CurrentWorld < MAX_WORLDS);
-                
-            if (GameState->OtherWorlds[GameState->CurrentWorld] == NULL)
-            {
-                int WorldW = 100;
-                int WorldH = 100;
-                world *NewWorld = GenerateWorld(WorldW, WorldH,
-                                                GameState->GlyphAtlas.GlyphPxW,
-                                                GameState->GlyphAtlas.GlyphPxH,
-                                                &GameState->ScratchArenaA);
-
-                TraceLog("Generated world #%d. World arena used size: %zu KB. Each entity is %zu bytes.",
-                         GameState->CurrentWorld, NewWorld->Arena.Used, sizeof(*GameState->World->Entities));
-
-                GameState->OtherWorlds[GameState->CurrentWorld] = NewWorld;
-            }
-
-            GameState->World = GameState->OtherWorlds[GameState->CurrentWorld];
-            
-            World = GameState->World;
-            entity *OldPlayer = Player;
-            Player = World->PlayerEntity;
-
-            if (OldPlayer != Player)
-            {
-                CopyEntity(OldPlayer, Player, World);
-            }
-
-            GameState->Camera.Target = GetPxPFromTileP(World, Player->Pos);
-
-            ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
-
-            TraceLog("Loaded world #%d.", GameState->CurrentWorld);
-                
-            GameState->RunState = RUN_STATE_IN_GAME;
-        } break;
-
-        case RUN_STATE_RANGED_ATTACK:
-        {
-            GameState->RunState = RunState_RangedAttack(GameState);
-        } break;
-
         case RUN_STATE_IN_GAME:
         {
+            game_input *GameInput = &GameState->GameInput;
+            ProcessInputs(GameState);
+            if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
+            if (KeyPressed(SDL_SCANCODE_F2)) GameState->ShowDebugUI = !GameState->ShowDebugUI;
+
             GameState->RunState = RunState_InGame(GameState);
-        } break;
-
-        case RUN_STATE_INVENTORY_MENU:
-        {
-            GameState->RunState = RunState_InventoryMenu(GameState);
-        } break;
-
-        case RUN_STATE_PICKUP_MENU:
-        {
-            GameState->RunState = RunState_PickupMenu(GameState);
-        } break;
-
-        case RUN_STATE_LEVELUP_MENU:
-        {
-            GameState->RunState = RunState_LevelupMenu(GameState);
         } break;
 
         case RUN_STATE_QUIT:
@@ -1029,7 +920,7 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
         };
     }
 
-    Assert(ValidateEntitySpatialPartition(GameState->World));
+    // Assert(ValidateEntitySpatialPartition(GameState->World));
 
     BeginDraw();
         // NOTE: Draw overlay render textures: lighting, debug, UI

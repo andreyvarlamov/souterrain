@@ -200,8 +200,6 @@ FindNextFreeEntitySlot(world *World)
     return Entity;
 }
 
-void EntityTurnQueueInsert(world *World, entity *Entity, int NewCostOwed);
-
 enum { ENTITY_HEALTH_DEFAULT = 100 };
 
 entity *
@@ -218,29 +216,8 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity)
         Entity->FieldOfView = MemoryArena_PushArray(&World->Arena, World->Width * World->Height, u8);
     }
 
-    b32 NeedInventory = Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_ITEM_PICKUP;
-    if (NeedInventory)
-    {
-        if (Entity->Inventory == NULL)
-        {
-            Entity->Inventory = MemoryArena_PushArrayAndZero(&World->Arena, INVENTORY_SLOTS_PER_ENTITY, item);
-        }
-        else
-        {
-            memset(Entity->Inventory, 0, INVENTORY_SLOTS_PER_ENTITY * sizeof(item));
-        }
-    }
-    
     Entity->Pos = Pos;
     Entity->DebugID = World->EntityCurrentDebugID++;
-    if (Entity->MaxHealth == 0)
-    {
-        Entity->Health = Entity->MaxHealth = ENTITY_HEALTH_DEFAULT;
-    }
-    if (Entity->Level == 0)
-    {
-        Entity->Level = 1;
-    }
 
     if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
     {
@@ -255,11 +232,6 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity)
     }
 
     AddEntityToSpatial(World, Pos, Entity);
-
-    if (Entity->ActionCost > 0)
-    {
-        EntityTurnQueueInsert(World, Entity, 0);
-    }
 
     return Entity;
 }
@@ -296,31 +268,6 @@ ValidateEntitySpatialPartition(world *World)
     return true;
 }
 
-void RemoveItemEffectsFromEntity(item *Item, entity *Entity);
-void ApplyItemEffectsToEntity(item *Item, entity *Entity);
-
-void
-CopyEntityInventory(entity *From, entity *To)
-{
-    item *ToInventoryItem = To->Inventory;
-    item *FromInventoryItem = From->Inventory;
-    for (int i = 0; i < INVENTORY_SLOTS_PER_ENTITY; i++, ToInventoryItem++, FromInventoryItem++)
-    {
-        *ToInventoryItem = *FromInventoryItem;
-        // if (ToInventoryItem->ItemType != ITEM_NONE)
-        // {
-        //     RemoveItemEffectsFromEntity(ToInventoryItem, To);
-        //     ToInventoryItem->ItemType = ITEM_NONE;
-        // }
-
-        // if (FromInventoryItem->ItemType != ITEM_NONE)
-        // {
-        //     *ToInventoryItem = *FromInventoryItem;
-        //     ApplyItemEffectsToEntity(ToInventoryItem, To);
-        // }
-    }
-}
-
 void
 CopyEntity(entity *From, entity *To, world *ToWorld)
 {
@@ -330,10 +277,7 @@ CopyEntity(entity *From, entity *To, world *ToWorld)
     To->Glyph = From->Glyph;
     To->Color = From->Color;
 
-    To->ActionCost = From->ActionCost;
-
     To->ViewRange = From->ViewRange;
-    To->RangedRange = From->RangedRange;
 
     Assert(To->FieldOfView || !From->FieldOfView);
     // NOTE: No need to copy of fov as it's world specific
@@ -343,163 +287,4 @@ CopyEntity(entity *From, entity *To, world *ToWorld)
 
     To->Name = From->Name;
     To->Description = From->Description;
-
-    To->Health = From->Health;
-    To->MaxHealth = From->MaxHealth;
-    To->ArmorClass = From->ArmorClass;
-
-    To->Mana = From->Mana;
-    To->MaxMana = From->MaxMana;
-
-    // To->LastHealTurn = From->LastHealTurn;
-    To->RegenActionCost = From->RegenActionCost;
-    To->RegenAmount = From->RegenAmount;
-
-    To->Haima = From->Haima;
-    To->Kitrina = From->Kitrina;
-    To->Melana = From->Melana;
-    To->Sera = From->Sera;
-
-    To->HaimaBonus = From->HaimaBonus;
-
-    To->Armor = From->Armor;
-    To->Damage = From->Damage;
-    To->RangedDamage = From->RangedDamage;
-
-    To->RangedRange = From->RangedRange;
-    To->FireballDamage = From->FireballDamage;
-    To->FireballRange = From->FireballRange;
-    To->FireballArea = From->FireballArea;
-    To->RendMindDamage = From->RendMindDamage;
-    To->RendMindRange = From->RendMindRange;
-
-    To->XP = From->XP;
-    To->Level = From->Level;
-
-
-    Assert(To->Inventory || !From->Inventory);
-    CopyEntityInventory(From, To);
-}
-
-inline entity_queue_node
-MakeEntityQueueNode(entity *Entity, int Cost)
-{
-    entity_queue_node Node;
-    Node.Entity = Entity;
-    Node.LeftoverCost = Cost;
-    return Node;
-}
-
-inline entity *
-EntityTurnQueuePeek(world *World)
-{
-    return World->EntityTurnQueue->Entity;
-}
-
-entity *
-EntityTurnQueuePopWithoutConsumingCost(world *World)
-{
-    entity_queue_node *TopNode = World->EntityTurnQueue;
-    entity *TopEntity = TopNode->Entity;
-
-    for (int I = 0; I < World->TurnQueueCount - 1; I++)
-    {
-        World->EntityTurnQueue[I] = World->EntityTurnQueue[I + 1];
-    }
-    World->TurnQueueCount--;
-
-    return TopEntity;
-}
-
-entity *
-EntityTurnQueuePop(world *World)
-{
-    entity_queue_node *TopNode = World->EntityTurnQueue;
-
-    entity *TopEntity = TopNode->Entity;
-    int CostToConsume = TopNode->LeftoverCost;
-
-    for (int I = 0; I < World->TurnQueueCount - 1; I++)
-    {
-        World->EntityTurnQueue[I] = World->EntityTurnQueue[I + 1];
-        World->EntityTurnQueue[I].LeftoverCost -= CostToConsume;
-    }
-    World->TurnQueueCount--;
-
-    return TopEntity;
-}
-
-void
-EntityTurnQueueInsert(world *World, entity *Entity, int NewCostOwed)
-{
-    Assert(World->TurnQueueCount < World->TurnQueueMax);
-    int InsertI;
-    for (InsertI = World->TurnQueueCount - 1; InsertI >= 0; InsertI--)
-    {
-        if (World->EntityTurnQueue[InsertI].LeftoverCost <= NewCostOwed)
-        {
-            break;
-        }
-    }
-    InsertI++;
-
-    for (int ShiftI = World->TurnQueueCount - 1; ShiftI >= InsertI; ShiftI--)
-    {
-        World->EntityTurnQueue[ShiftI + 1] = World->EntityTurnQueue[ShiftI];
-    }
-    World->TurnQueueCount++;
-
-    Assert(InsertI >= 0 && InsertI < World->TurnQueueMax);
-
-    World->EntityTurnQueue[InsertI] = MakeEntityQueueNode(Entity, NewCostOwed);
-}
-
-int
-EntityTurnQueuePopAndReinsert(world *World, int NewCostOwed)
-{
-    entity *Entity = World->EntityTurnQueue->Entity;
-    int CostToConsume = World->EntityTurnQueue->LeftoverCost;
-    
-    int InsertI;
-    for (InsertI = World->TurnQueueCount - 1; InsertI > 0; InsertI--)
-    {
-        World->EntityTurnQueue[InsertI].LeftoverCost -= CostToConsume;
-        if (World->EntityTurnQueue[InsertI].LeftoverCost <= NewCostOwed)
-        {
-            // NOTE: Set cost back up, because it will be subtracted again in the next for loop
-            World->EntityTurnQueue[InsertI].LeftoverCost += CostToConsume;
-            break;
-        }
-    }
-
-    for (int I = 0; I < InsertI; I++)
-    {
-        World->EntityTurnQueue[I] = World->EntityTurnQueue[I + 1];
-        World->EntityTurnQueue[I].LeftoverCost -= CostToConsume;
-    }
-
-    Assert(InsertI >= 0 && InsertI < World->TurnQueueMax);
-
-    World->EntityTurnQueue[InsertI] = MakeEntityQueueNode(Entity, NewCostOwed);
-
-    return CostToConsume;
-}
-
-void
-EntityTurnQueueDelete(world *World, entity *Entity)
-{
-    int ToDeleteI;
-    for (ToDeleteI = 0; ToDeleteI < World->TurnQueueCount; ToDeleteI++)
-    {
-        if (World->EntityTurnQueue[ToDeleteI].Entity == Entity)
-        {
-            break;
-        }
-    }
-
-    for (int ShiftI = ToDeleteI; ShiftI < World->TurnQueueCount - 1; ShiftI++)
-    {
-        World->EntityTurnQueue[ShiftI] = World->EntityTurnQueue[ShiftI + 1];
-    }
-    World->TurnQueueCount--;
 }

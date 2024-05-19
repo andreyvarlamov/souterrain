@@ -10,16 +10,20 @@ RunState_InGame(game_state *GameState)
 
     if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
     if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
-    // if (KeyPressed(SDL_SCANCODE_F1))
-    // {
-    //     GameState->IgnoreFieldOfView = !GameState->IgnoreFieldOfView;
-    //     ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
-    // }
     
     run_state NewRunState = RUN_STATE_IN_GAME;
     
     i64 StartTurn = World->CurrentTurn;
-            
+
+    ProcessPlayerInputs(&GameState->PlayerReqAction);
+    b32 TurnUsed = UpdatePlayer(Player, World, &GameState->Camera, &GameState->PlayerReqAction, GameState, &NewRunState);
+    if (TurnUsed)
+    {
+        ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
+    }
+    ResetPlayerInputs(&GameState->PlayerReqAction);
+
+#if 0       
     entity *ActiveEntity = EntityTurnQueuePeek(World);
     if (ActiveEntity == Player)
     {
@@ -108,19 +112,13 @@ RunState_InGame(game_state *GameState)
     {
         EndInspect(&GameState->InspectState);
     }
-    
+#endif
+
     DrawGame(GameState, World);
 
     BeginUIDraw(GameState);
     DrawDebugUI(GameState, GameInput->MouseWorldTileP);
     DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
-    
-    DrawInspectUI(&GameState->InspectState, GameState);
-
-    if (KeyPressed(SDL_SCANCODE_ESCAPE))
-    {
-        EndInspect(&GameState->InspectState);
-    }
     
     EndUIDraw();
 

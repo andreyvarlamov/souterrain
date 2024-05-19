@@ -8,7 +8,6 @@
 #endif
 
 #include "souterrain.h"
-#include "sou_level_stats.cpp"
 
 TEMPLATE_FUNC void
 Template_DUMMY()
@@ -225,19 +224,6 @@ Template_Player()
     Template.Description = "After Derval's disappearance you awake in the Souterrain. You've read about this place in the dusty tomes kept in St Catherine's Library. You remember one thing: the only way is down.";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
 
-    Template.Haima = 17;
-    Template.Kitrina = 9;
-    Template.Melana = 5;
-    Template.Sera = 3;
-    Template.Damage = 2; // NOTE: From weapon
-    Template.RangedDamage = 1; // NOTE: From weapon
-    Template.Armor = 10; // NOTE: From weapon
-    SetEntityStatsBasedOnAttributes(&Template);
-
-    Template.ActionCost = 100;
-
-    Template.RegenActionCost = 1000;
-
     return Template;
 }
 #else
@@ -245,135 +231,18 @@ Template_Player()
 #endif
 
 TEMPLATE_FUNC entity
-Template_AetherFly()
+Template_TestEnemy()
 #ifdef TEMPLATE_EXPORTS
 {
     entity Template = {};
     Template.Type = ENTITY_NPC;
     Template.Color = VA_CORAL;
-    Template.Glyph = 1 + 9*16;
-    Template.ViewRange = 15;
+    Template.Glyph = 'E';
+    Template.ViewRange = 30;
     Template.NpcState = NPC_STATE_IDLE;
-    Template.Name = "Aether Fly";
-    Template.Description = "Sentient dipteron from the outer realms. Condemned to roam the Souterrain for eternity by the jealous goddess Latena.";
+    Template.Name = "Test Enemy";
     SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
 
-    Template.Haima = 3;
-    Template.Kitrina = 5;
-    Template.Melana = 1;
-    Template.Sera = 1;
-    Template.Damage = 1;
-    Template.Armor = 10;
-    SetEntityStatsBasedOnAttributes(&Template);
-
-    Template.ActionCost = 80;
-
-    Template.RegenActionCost = 1500;
-
-    Template.XPGain = 50;
-    
-    return Template;
-}
-#else
-;
-#endif
-
-TEMPLATE_FUNC entity
-Template_EtherealMartyr()
-#ifdef TEMPLATE_EXPORTS
-{
-    entity Template = {};
-    Template.Type = ENTITY_NPC;
-    Template.Color = VA_BROWN;
-    Template.Glyph = 'M';
-    Template.ViewRange = 25;
-    Template.NpcState = NPC_STATE_IDLE;
-    Template.Name = "Ethereal Martyr";
-    Template.Description = "A fighter against Latena, a martyr of ethereal creatures. Hated by humans.";
-    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
-
-    Template.Haima = 13;
-    Template.Kitrina = 5;
-    Template.Melana = 5;
-    Template.Sera = 5;
-    Template.Damage = 2;
-    Template.Armor = 10;
-    SetEntityStatsBasedOnAttributes(&Template);
-
-    Template.ActionCost = 110;
-
-    Template.RegenActionCost = 1500;
-
-    Template.XPGain = 150;
-    
-    return Template;
-}
-#else
-;
-#endif
-
-TEMPLATE_FUNC entity
-Template_FacelessSoul()
-#ifdef TEMPLATE_EXPORTS
-{
-    entity Template = {};
-    Template.Type = ENTITY_NPC;
-    Template.Color = VA_DARKBLUE;
-    Template.Glyph = 6 + 8*16;
-    Template.ViewRange = 25;
-    Template.NpcState = NPC_STATE_IDLE;
-    Template.Name = "Faceless Soul";
-    Template.Description = "A vagabond from the overworld. His face has decayed beyond recognition, while his body is seemingly intact.";
-    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
-
-    Template.Haima = 10;
-    Template.Kitrina = 20;
-    Template.Melana = 5;
-    Template.Sera = 5;
-    Template.Damage = 2;
-    Template.Armor = 10;
-    SetEntityStatsBasedOnAttributes(&Template);
-
-    Template.ActionCost = 110;
-
-    Template.RegenActionCost = 1500;
-
-    Template.XPGain = 250;
-    
-    return Template;
-}
-#else
-;
-#endif
-
-TEMPLATE_FUNC entity
-Template_Crane()
-#ifdef TEMPLATE_EXPORTS
-{
-    entity Template = {};
-    Template.Type = ENTITY_NPC;
-    Template.Color = VA_PINK;
-    Template.Glyph = 7 + 8*16;
-    Template.ViewRange = 25;
-    Template.NpcState = NPC_STATE_IDLE;
-    Template.Name = "Crane";
-    Template.Description = "Previously thought to be extinct species of bird. Looks like he's full of bile, ready to burst at any minute.";
-    SetFlags(&Template.Flags, ENTITY_IS_BLOCKING);
-
-    Template.Haima = 10;
-    Template.Kitrina = 15;
-    Template.Melana = 5;
-    Template.Sera = 5;
-    Template.Damage = 2;
-    Template.Armor = 5;
-    SetEntityStatsBasedOnAttributes(&Template);
-
-    Template.ActionCost = 100;
-
-    Template.RegenActionCost = 1500;
-
-    Template.XPGain = 250;
-    
     return Template;
 }
 #else

@@ -228,7 +228,7 @@ UpdateNpc(game_state *GameState, world *World, entity *Entity)
 
             default:
             {
-                InvalidCodePath;
+                    InvalidCodePath;
             } break;
         }
     }
