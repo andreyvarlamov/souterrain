@@ -2,12 +2,48 @@
 
 #include <cstring> // memset
 
-#include "sou_pathfinding.cpp"
-#include "sou_lineofsight.cpp"
-#include "sou_entity.cpp"
+#include "sou_path_finding.h"
+#include "sou_turn_queue.h"
 
-static_i vec2i
-GetRandomRoomP(room *Room, int Pad)
+enum { ENTITY_MAX_COUNT = 16384 };
+ 
+enum room_type
+{
+    ROOM_NONE,
+    ROOM_ENTRANCE,
+    ROOM_SACRIFICIAL,
+    ROOM_WASTE,
+    ROOM_TEMPLE,
+    ROOM_XLARGE,
+    ROOM_LARGE,
+    ROOM_MEDIUM,
+    ROOM_SMALL,
+    ROOM_EXIT
+};
+
+enum gen_tile_type
+{
+    GEN_TILE_NONE = 0,
+    GEN_TILE_FLOOR,
+    GEN_TILE_WALL,
+    GEN_TILE_CORRIDOR,
+    GEN_TILE_STATUE,
+    GEN_TILE_STAIR_UP,
+    GEN_TILE_STAIR_DOWN,
+};
+
+struct room
+{
+    int X;
+    int Y;
+    int W;
+    int H;
+
+    room_type Type;
+};
+
+internal_func vec2i
+_GetRandomRoomP(room *Room, int Pad)
 {
     int X = GetRandomValue(Room->X+Pad, Room->X+Room->W-Pad);
     int Y = GetRandomValue(Room->Y+Pad, Room->Y+Room->H-Pad);
@@ -15,8 +51,8 @@ GetRandomRoomP(room *Room, int Pad)
     return Vec2I(X, Y);
 }
 
-static_i vec2i
-GetCenterRoomP(room *Room)
+internal_func vec2i
+_GetCenterRoomP(room *Room)
 {
     int X = Room->X + Room->W/2;
     int Y = Room->Y + Room->H/2;
@@ -25,7 +61,7 @@ GetCenterRoomP(room *Room)
 }
 
 void
-GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsMax, int *RoomCount)
+_GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsMax, int *RoomCount)
 {
     int TileCount = World->Width * World->Height;
 
@@ -240,7 +276,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
             {
                 case ROOM_ENTRANCE:
                 {
-                    vec2i P = GetCenterRoomP(Room);
+                    vec2i P = _GetCenterRoomP(Room);
                     GeneratedMap[XYToIdx(P, World->Width)] = GEN_TILE_STAIR_UP;
                     // TODO: Novice item drop close to the middle
                     // TODO: A low level enemy close to the middle
@@ -254,7 +290,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
                     int Attempts;
                     for (Statues = 0, Attempts = 0; Statues < StatuesMax && Attempts < AttemptsMax; Attempts++)
                     {
-                        vec2i P = GetRandomRoomP(Room, 1);
+                        vec2i P = _GetRandomRoomP(Room, 1);
                         u8 *GenTileType = GeneratedMap + XYToIdx(P, World->Width);
                         if (*GenTileType == GEN_TILE_FLOOR)
                         {
@@ -266,7 +302,7 @@ GenerateRoomMap(world *World, u8 *GeneratedMap, room *GeneratedRooms, int RoomsM
 
                 case ROOM_EXIT:
                 {
-                    vec2i P = GetCenterRoomP(Room);
+                    vec2i P = _GetCenterRoomP(Room);
                     GeneratedMap[XYToIdx(P, World->Width)] = GEN_TILE_STAIR_DOWN;
                     // TODO: Level boss
                 } break;;
@@ -310,9 +346,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
 
     World->SpatialEntities = MemoryArena_PushArray(WorldArena, World->Width * World->Height, entity *);
 
-    World->TurnQueueCount = 0;
-    World->TurnQueueMax = World->EntityMaxCount;
-    World->EntityTurnQueue = MemoryArena_PushArray(WorldArena, World->TurnQueueMax, entity_queue_node);
+    World->TurnQueue = TurnQueueMake(WorldArena, World->EntityMaxCount);
 #pragma endregion
 
 #pragma region GET TEMPLATES
@@ -338,7 +372,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
     int RoomsMax = 50;
     int RoomCount;
     room *GeneratedRooms = MemoryArena_PushArrayAndZero(ScratchArena, RoomsMax, room);
-    GenerateRoomMap(World, GeneratedEntityMap, GeneratedRooms, RoomsMax, &RoomCount);
+    _GenerateRoomMap(World, GeneratedEntityMap, GeneratedRooms, RoomsMax, &RoomCount);
     MemoryArena_ResizePreviousPushArray(ScratchArena, RoomCount, room);
 
     vec2i PlayerP = Vec2I(GeneratedRooms[0].X + GeneratedRooms[0].W / 2, GeneratedRooms[0].Y + GeneratedRooms[0].H / 2);
@@ -411,7 +445,7 @@ GenerateWorld(int WorldW, int WorldH, int TilePxW, int TilePxH, memory_arena *Sc
 #pragma endregion
 
 #pragma region POST GEN ENTITIES
-    World->PlayerEntity = AddEntity(World, PlayerP, &Player);
+    World->PlayerEntity = AddEntity(World, PlayerP, &Player, true);
 
 #if (ITEM_PICKUP_TEST == 1)
     entity *ItemPickupTest = AddEntity(World, World->PlayerEntity->Pos + Vec2I(0, -1), &ItemPickupTemplate);

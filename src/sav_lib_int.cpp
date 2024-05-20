@@ -100,7 +100,7 @@ struct gl_state
     sav_shader CurrentShader;
 };
 
-// SECTION: Internal state
+// SECTION: internal state
 static_g sdl_state gSdlState;
 static_g win32_state gWin32State;
 static_g gl_state gGlState;

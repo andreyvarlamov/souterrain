@@ -1,3 +1,5 @@
+#include "sou_entity.h"
+
 entity *
 GetEntitiesAt(vec2i P, world *World)
 {
@@ -65,7 +67,7 @@ CheckCollisions(world *World, vec2i P, b32 IgnoreNPCs)
             // if (EntityExists(Entity) && Entity->Pos == P && CheckFlags(Entity->Flags, ENTITY_IS_BLOCKING))
             if (EntityExists(Entity) && Entity->Pos == P)
             {
-                if (CheckFlags(Entity->Flags, ENTITY_IS_BLOCKING) && (!IgnoreNPCs || Entity->Type != ENTITY_NPC))
+                if (CheckFlags(Entity->Flags, ENTITY_IS_BLOCKING) && (!IgnoreNPCs || Entity->Type != ENTITY_CHARACTER))
                 {
                     FoundBlocking = true;
                     break;
@@ -203,13 +205,12 @@ FindNextFreeEntitySlot(world *World)
 enum { ENTITY_HEALTH_DEFAULT = 100 };
 
 entity *
-AddEntity(world *World, vec2i Pos, entity *CopyEntity)
+AddEntity(world *World, vec2i Pos, entity *CopyEntity, b32 NeedFOV)
 {
     entity *Entity = FindNextFreeEntitySlot(World);
 
     *Entity = *CopyEntity;
     
-    b32 NeedFOV = Entity->Type == ENTITY_PLAYER;
     if (NeedFOV && Entity->FieldOfView == NULL)
     {
         // TODO: Allocate only for the entity max range rect
@@ -219,7 +220,7 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity)
     Entity->Pos = Pos;
     Entity->DebugID = World->EntityCurrentDebugID++;
 
-    if (Entity->Type == ENTITY_PLAYER || Entity->Type == ENTITY_NPC)
+    if (Entity->Type == ENTITY_CHARACTER)
     {
         Entity->HealthData.Blood.Current = Entity->HealthData.Blood.Max = 100.0f;
         Entity->HealthData.Head.Current = Entity->HealthData.Head.Max = 100.0f;
@@ -290,10 +291,8 @@ CopyEntity(entity *From, entity *To, world *ToWorld)
 }
 
 b32
-MoveEntity(world *World, entity *Entity, vec2i NewP, b32 ShouldAttack, b32 *Out_TurnUsed)
+MoveEntity(world *World, entity *Entity, vec2i NewP)
 {
-    *Out_TurnUsed = false;
-    
     Assert(Entity->Type > 0);
     
     collision_info Col = CheckCollisions(World, NewP);
@@ -304,55 +303,28 @@ MoveEntity(world *World, entity *Entity, vec2i NewP, b32 ShouldAttack, b32 *Out_
         {
             // *Out_TurnUsed = ResolveEntityCollision(Entity, Col.Entity, World, ShouldAttack);
         }
-
         return false;
     }
     else
     {
         RemoveEntityFromSpatial(World, Entity->Pos, Entity);
         AddEntityToSpatial(World, NewP, Entity);
-
         Entity->Pos = NewP;
-        
-#if 0
-        LogEntityAction(Entity, World, "%s (%d) moves without hitting anyone", Entity->Name, Entity->DebugID);
-#endif
-        
-        *Out_TurnUsed = true;
         return true;
     }
 }
 
-b32
-MovePlayer(world *World, entity *Player, vec2i NewP, camera_2d *Camera)
+b32 UpdateEntity(world *World, entity *Entity, req_action *Action)
 {
-    vec2i OldP = Player->Pos;
     b32 TurnUsed = false;
-    if (MoveEntity(World, Player, NewP, true, &TurnUsed))
-    {
-        if (IsPositionInCameraView(OldP, Camera, World))
-        {
-            Camera->Target += GetPxPFromTileP(World, Player->Pos) - GetPxPFromTileP(World, OldP);
-        }
-        else
-        {
-            Camera->Target = GetPxPFromTileP(World, Player->Pos);
-        }
-    }
-    return TurnUsed;
-}
 
-b32
-UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action, game_state *GameState)
-{
-    b32 TurnUsed = false;
     switch (Action->T)
     {
         default: break;
                     
         case ACTION_MOVE:
         {
-            TurnUsed = MovePlayer(World, Player, Player->Pos + Action->DP, Camera);
+            TurnUsed = MoveEntity(World, Entity, Entity->Pos + Action->DP);
         } break;
 
         case ACTION_TELEPORT:
@@ -375,7 +347,7 @@ UpdatePlayer(entity *Player, world *World, camera_2d *Camera, req_action *Action
 
             if (FoundPosition)
             {
-                TurnUsed = MovePlayer(World, Player, NewP, Camera);
+                TurnUsed = MoveEntity(World, Entity, NewP);
             }
         } break;
 

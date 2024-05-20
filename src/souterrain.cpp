@@ -1,12 +1,13 @@
 #include "sav_lib.h"
-#include "souterrain.h"
 #include "sou_templates.h"
 
-#include "va_util.h"
-#include "va_types.h"
-#include "va_memarena.h"
-#include "va_linmath.h"
-#include "va_colors.h"
+#include "souterrain.h"
+#include "sou_world.h"
+#include "sou_entity.h"
+#include "sou_player_input.h"
+#include "sou_line_of_sight.h"
+
+#include "va_common.h"
 
 #include <sdl2/SDL_scancode.h>
 #include <sdl2/SDL_mouse.h>
@@ -15,8 +16,6 @@
 #include <glad/glad.h>
 
 #include <cstdio>
-
-#include "sou_world.cpp"
 
 sav_texture
 GenerateVignette(memory_arena *TrArenaA)
@@ -285,7 +284,7 @@ DrawLighting(game_state *GameState)
 void
 DrawEntities(game_state *GameState, vec3 LightPosition)
 {
-    static_i b32 WillDrawRoomGround = false;
+    internal_func b32 WillDrawRoomGround = false;
 
     BeginShaderMode(GameState->Glyph3DShader); {
         SetUniformVec3("lightPos", &LightPosition.E[0]);
@@ -311,7 +310,7 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
                 entity *EntityCursor = Entity;
                 while (EntityCursor)
                 {
-                    if (EntityCursor->Type == ENTITY_NPC || EntityCursor->Type == ENTITY_PLAYER)
+                    if (EntityCursor->Type == ENTITY_CHARACTER)
                     {
                         Entity  = EntityCursor;
                         break;
@@ -326,7 +325,7 @@ DrawEntities(game_state *GameState, vec3 LightPosition)
                     
                 if (Entity)
                 {
-                    if (DarknessLevel == DARKNESS_IN_VIEW || (Entity->Type != ENTITY_NPC))
+                    if (DarknessLevel == DARKNESS_IN_VIEW || (Entity->Type != ENTITY_CHARACTER))
                     {
                         vec2i WorldP = IdxToXY(WorldI, GameState->World->Width);
                         rect Dest = GetWorldDestRect(GameState->World, WorldP);
@@ -671,50 +670,6 @@ ProcessInputs(game_state *GameState)
 }
 
 void
-ResetPlayerInputs(req_action *Action)
-{
-    *Action = {};
-}
-
-void
-ProcessPlayerInputs(req_action *Action)
-{
-    if (Action->T != ACTION_NONE) return;
-    
-    if (KeyPressedOrRepeat(SDL_SCANCODE_Q)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1, -1); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_W)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 0, -1); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_E)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1, -1); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_A)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1,  0); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_X)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 0,  1); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_D)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1,  0); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_Z)) { Action->T = ACTION_MOVE; Action->DP = Vec2I(-1,  1); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_C)) { Action->T = ACTION_MOVE; Action->DP = Vec2I( 1,  1); }
-    else if (KeyPressedOrRepeat(SDL_SCANCODE_S)) Action->T = ACTION_SKIP_TURN;
-    else if (KeyPressed(SDL_SCANCODE_R)) Action->T = ACTION_DROP_ALL_ITEMS;
-    // else if (KeyPressed(SDL_SCANCODE_T)) Action->T = ACTION_TELEPORT;
-    else if (KeyPressed(SDL_SCANCODE_I)) Action->T = ACTION_OPEN_INVENTORY;
-    else if (KeyPressed(SDL_SCANCODE_G)) Action->T = ACTION_OPEN_PICKUP;
-    else if (KeyPressed(SDL_SCANCODE_PERIOD) && (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT))) Action->T = ACTION_NEXT_LEVEL;
-    else if (KeyPressed(SDL_SCANCODE_COMMA) && (KeyDown(SDL_SCANCODE_LSHIFT) || KeyDown(SDL_SCANCODE_RSHIFT))) Action->T = ACTION_PREV_LEVEL;
-    else if (KeyPressed(SDL_SCANCODE_F)) Action->T = ACTION_START_RANGED_ATTACK;
-    else if (KeyPressed(SDL_SCANCODE_1)) Action->T = ACTION_START_FIREBALL;
-    else if (KeyPressed(SDL_SCANCODE_2)) Action->T = ACTION_START_RENDMIND;
-}
-
-void
-ProcessSwarms(world *World, i64 TurnsPassed)
-{
-    swarm *Swarm = World->Swarms;
-    for (int i = 0; i < World->SwarmCount; i++, Swarm++)
-    {
-        if (Swarm->Cooldown > 0)
-        {
-            Swarm->Cooldown -= TurnsPassed;
-        }
-    }
-}
-
-void
 ProcessPlayerFOV(world *World, b32 IgnoreFieldOfView)
 {
     if (IgnoreFieldOfView)
@@ -808,16 +763,15 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         int WorldW = 100;
         int WorldH = 100;
-        GameState->CurrentWorld = 0;
-        GameState->World = GameState->OtherWorlds[GameState->CurrentWorld] = GenerateWorld(WorldW, WorldH,
-                                                                                           GameState->GlyphAtlas.GlyphPxW,
-                                                                                           GameState->GlyphAtlas.GlyphPxH,
-                                                                                           &GameState->ScratchArenaA);
+        GameState->World = GenerateWorld(WorldW, WorldH,
+                                         GameState->GlyphAtlas.GlyphPxW,
+                                         GameState->GlyphAtlas.GlyphPxH,
+                                         &GameState->ScratchArenaA);
 
         ProcessPlayerFOV(GameState->World, false);
         
-        TraceLog("Generated world #%d. World arena used size: %zu KB. Each entity is %zu bytes.",
-                 GameState->CurrentWorld, GameState->World->Arena.Used, sizeof(*GameState->World->Entities));
+        TraceLog("Generated world #0. World arena used size: %zu KB. Each entity is %zu bytes.",
+                 GameState->World->Arena.Used, sizeof(*GameState->World->Entities));
 
         GameState->Camera.Rotation = 0.0f;
         CameraInitLogZoomSteps(&GameState->Camera, 0.2f, 5.0f, 5);
@@ -873,6 +827,11 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
     GameState->IgnoreFieldOfView = true;
 
+    game_input *GameInput = &GameState->GameInput;
+    ProcessInputs(GameState);
+    if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
+    if (KeyPressed(SDL_SCANCODE_F2)) GameState->ShowDebugUI = !GameState->ShowDebugUI;
+
     switch (GameState->RunState)
     {
         case RUN_STATE_NONE:
@@ -882,32 +841,41 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
         case RUN_STATE_IN_GAME:
         {
-            game_input *GameInput = &GameState->GameInput;
-            ProcessInputs(GameState);
-            if (KeyPressed(SDL_SCANCODE_F11)) ToggleWindowBorderless();
-            if (KeyPressed(SDL_SCANCODE_F2)) GameState->ShowDebugUI = !GameState->ShowDebugUI;
 
-            world *World = GameState->World;
-            entity *Player = World->PlayerEntity;
-
-            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(&GameState->Camera, MouseWheel());
-            if (MouseDown(SDL_BUTTON_MIDDLE)) GameState->Camera.Target -= CameraScreenToWorldRel(&GameState->Camera, GetMouseRelPos());
             
-            i64 StartTurn = World->CurrentTurn;
+            world *World = GameState->World;
+            entity *PlayerEntity = World->PlayerEntity;
+            camera_2d *Camera = &GameState->Camera;
+            
+            if (MouseWheel() != 0) CameraIncreaseLogZoomSteps(Camera, MouseWheel());
+            if (MouseDown(SDL_BUTTON_MIDDLE)) Camera->Target -= CameraScreenToWorldRel(Camera, GetMouseRelPos());
+            
+            req_action PlayerReqAction = {};
+            ProcessPlayerInputs(&PlayerReqAction);
 
-            ProcessPlayerInputs(&GameState->PlayerReqAction);
-            b32 TurnUsed = UpdatePlayer(Player, World, &GameState->Camera, &GameState->PlayerReqAction, GameState);
-            if (TurnUsed)
+            vec2i OldP = PlayerEntity->Pos;
+            b32 Moved = UpdateEntity(World, PlayerEntity, &PlayerReqAction);
+            if (Moved)
             {
+                if (IsPositionInCameraView(OldP, Camera, World))
+                {
+                    Camera->Target += GetPxPFromTileP(World, PlayerEntity->Pos) - GetPxPFromTileP(World, OldP);
+                }
+                else
+                {
+                    Camera->Target = GetPxPFromTileP(World, PlayerEntity->Pos);
+                }
+
                 ProcessPlayerFOV(World, GameState->IgnoreFieldOfView);
             }
-            ResetPlayerInputs(&GameState->PlayerReqAction);
 
-            DrawGame(GameState, World);
+            ResetPlayerInputs(&PlayerReqAction);
+
+            DrawGame(GameState, GameState->World);
 
             BeginUIDraw(GameState);
             DrawDebugUI(GameState, GameInput->MouseWorldTileP);
-            DrawPlayerStatsUI(GameState, Player, GameInput->MouseWorldPxP);
+            DrawPlayerStatsUI(GameState, PlayerEntity, GameInput->MouseWorldPxP);
             
             EndUIDraw();
         } break;
@@ -941,3 +909,10 @@ UpdateAndRender(b32 *Quit, b32 Reloaded, game_memory GameMemory)
 
     SavSwapBuffers();
 }
+
+#include "sou_world.cpp"
+#include "sou_entity.cpp"
+#include "sou_player_input.cpp"
+#include "sou_turn_queue.cpp"
+#include "sou_path_finding.cpp"
+#include "sou_line_of_sight.cpp"

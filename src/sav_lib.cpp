@@ -23,10 +23,10 @@
 #include "sav_lib_int.cpp"
 
 // ------------------------
-// SECTION: Internal functions
+// SECTION: internal functions
 // ------------------------
 
-static_i void *
+internal_func void *
 Win32AllocMemory(size_t Size)
 {
     void *Memory = VirtualAlloc(0, Size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -39,7 +39,7 @@ Win32AllocMemory(size_t Size)
     return Memory;
 }
 
-static_i FILETIME
+internal_func FILETIME
 Win32GetFileModifiedTime(const char *FilePath)
 {
     FILETIME LastWriteTime = {};
@@ -53,7 +53,7 @@ Win32GetFileModifiedTime(const char *FilePath)
     return LastWriteTime;
 }
 
-static_i b32
+internal_func b32
 Win32LoadGameCode(game_code *GameCode)
 {
     CopyFile(GameCode->SourceDllPath.D, GameCode->TempDllPath.D, FALSE);
@@ -77,7 +77,7 @@ Win32LoadGameCode(game_code *GameCode)
     return false;
 }
 
-static_i void
+internal_func void
 Win32UnloadGameCode(game_code *GameCode)
 {
     if (GameCode->Dll)
@@ -91,7 +91,7 @@ Win32UnloadGameCode(game_code *GameCode)
     GameCode->UpdateAndRenderFunc = 0;
 }
 
-static_i b32
+internal_func b32
 Win32ReloadGameCode(game_code *GameCode)
 {
     FILETIME DllNewWriteTime = Win32GetFileModifiedTime(GameCode->SourceDllPath.D);
@@ -261,7 +261,7 @@ ReloadGameCode(void **UpdateAndRenderFunc)
 
 // SECTION: Program state/sdl window
 
-static_i sav_shader BuildBasicShader();
+internal_func sav_shader BuildBasicShader();
 
 b32
 InitWindow(const char *WindowName, int WindowWidth, int WindowHeight)
@@ -778,7 +778,7 @@ void FreeSoundChunk(sound_chunk Chunk)
 }
 
 // SECTION: Drawing
-static_i u32
+internal_func u32
 BuildShadersFromStr(const char *VertSource, const char *FragSource)
 {
     u32 VertShader = glCreateShader(GL_VERTEX_SHADER);
@@ -922,7 +922,7 @@ SetShaderMatricesBindingPoint(sav_shader Shader, const char *UBOName)
     glUniformBlockBinding(Shader.Glid, BlockIndex, gGlState.MatricesUBOBindingPoint);
 }
 
-static_i int
+internal_func int
 GetUniformLocation(u32 Shader, const char *UniformName)
 {
     int UniformLocation = glGetUniformLocation(gGlState.CurrentShader.Glid, UniformName);
@@ -1195,7 +1195,7 @@ EndCameraMode()
     gGlState.CameraModeActive = false;
 }
 
-static_i void
+internal_func void
 SetCurrentMVP()
 {
     gl_state *GlState = &gGlState;

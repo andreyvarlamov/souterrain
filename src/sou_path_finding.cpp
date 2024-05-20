@@ -1,5 +1,22 @@
-f32
-GetHeuristic(vec2i Start, vec2i End)
+#include "sou_path_finding.h"
+
+#include "va_common.h"
+
+enum { OPEN_SET_MAX = 1024, PATHFIND_MAX_ITERATIONS = 1024, PATH_MAX = 512 };
+
+struct path_state
+{
+    int *OpenSet;
+    int OpenSetCount;
+
+    int *CameFrom;
+    f32 *GScores;
+    f32 *FScores;
+    int MapSize;
+};
+
+internal_func inline f32
+_GetHeuristic(vec2i Start, vec2i End)
 {
     #if 1
     // NOTE: Sq Dist. Really unadmissible. Fast but very unoptimal path.
@@ -17,8 +34,8 @@ GetHeuristic(vec2i Start, vec2i End)
     #endif
 }
 
-b32
-PopLowestScoreFromOpenSet(path_state *PathState, int *LowestScoreIdx)
+internal_func inline b32
+_PopLowestScoreFromOpenSet(path_state *PathState, int *LowestScoreIdx)
 {
     // NOTE: One of the first optimizations that could be done here is to convert this to a min heap
     if (PathState->OpenSetCount > 0)
@@ -48,8 +65,8 @@ PopLowestScoreFromOpenSet(path_state *PathState, int *LowestScoreIdx)
     return false;
 }
 
-b32
-IsInOpenSet(path_state *PathState, int Idx)
+internal_func inline b32
+_IsInOpenSet(path_state *PathState, int Idx)
 {
     for (int i = 0; i < PathState->OpenSetCount; i++)
     {
@@ -62,29 +79,19 @@ IsInOpenSet(path_state *PathState, int Idx)
     return false;
 }
 
-// static_g int CalculatePathCalls = 0;
-// static_g int OpenSetMax = 0;
-
-// void ResetPathCallCount() { CalculatePathCalls = 0; OpenSetMax = 0; }
-// int GetPathCallCount() { return CalculatePathCalls; }
-// int GetPathOpenSetMax() { return OpenSetMax; }
-
-void
-AddToOpenSet(path_state *PathState, int Idx)
+internal_func inline void
+_AddToOpenSet(path_state *PathState, int Idx)
 {
-    if (!IsInOpenSet(PathState, Idx))
+    if (!_IsInOpenSet(PathState, Idx))
     {
         PathState->OpenSet[PathState->OpenSetCount++] = Idx;
-        
-        // if (PathState->OpenSetCount > OpenSetMax)
-        // {
-        //     OpenSetMax = PathState->OpenSetCount;
-        // }
     }
 }
 
-void
-GetNeighbors(vec2i Pos, world *World,
+#include "sou_world.h"
+
+internal_func inline void
+_GetNeighbors(vec2i Pos, world *World,
              vec2i *Neighbors, b32 *DiagonalNeighbors, int *NeighborCount)
 {
     *NeighborCount = 0;
@@ -105,25 +112,16 @@ GetNeighbors(vec2i Pos, world *World,
 
 #undef VIZ
 
-collision_info CheckCollisions(world *World, vec2i P, b32 IgnoreNPCs = false);
+collision_info CheckCollisions(world *World, vec2i P, b32 IgnoreNPCs);
 
-path_result
-CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memory_arena *ResultArena, int MaxIterations = 0xFFFFFFFF, b32 IgnoreNPCs = false, int VizGenMax = 0)
+internal_func path_result
+CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memory_arena *ResultArena, b32 IgnoreNPCs)
 {
     // CalculatePathCalls++;
     
-    int VizGen = 0;
     path_result Result = {};
 
     MemoryArena_Freeze(TrArena);
-
-#ifdef VIZ
-    if (VizGen >= VizGenMax)
-    {
-        goto routine_end;
-    }
-    VizGen++;
-#endif
 
     path_state PathState;
     PathState.OpenSet = MemoryArena_PushArray(TrArena, OPEN_SET_MAX, int);
@@ -144,7 +142,7 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
     PathState.OpenSet[PathState.OpenSetCount++] = StartIdx;
     PathState.CameFrom[StartIdx] = 0;
     PathState.GScores[StartIdx] = 0;
-    PathState.FScores[StartIdx] = GetHeuristic(Start, End);
+    PathState.FScores[StartIdx] = _GetHeuristic(Start, End);
 
     int EndIdx = XYToIdx(End, World->Width);
 
@@ -157,8 +155,7 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
 
     b32 FoundPath = false;
     int CurrentIdx;
-    int IterationCount = 0;
-    while (PopLowestScoreFromOpenSet(&PathState, &CurrentIdx))
+    while (_PopLowestScoreFromOpenSet(&PathState, &CurrentIdx))
     {
         if (CurrentIdx == EndIdx)
         {
@@ -169,7 +166,7 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
         vec2i Neighbors[8];
         b32 DiagonalNeighbors[8];
         int NeighborCount;
-        GetNeighbors(IdxToXY(CurrentIdx, World->Width), World, Neighbors, DiagonalNeighbors, &NeighborCount);
+        _GetNeighbors(IdxToXY(CurrentIdx, World->Width), World, Neighbors, DiagonalNeighbors, &NeighborCount);
 
         for (int i = 0; i < NeighborCount; i++)
         {
@@ -190,36 +187,16 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
                 {
                     PathState.CameFrom[NeighborIdx] = CurrentIdx;
                     PathState.GScores[NeighborIdx] = ThisGScore;
-                    PathState.FScores[NeighborIdx] = ThisGScore + GetHeuristic(Neighbor, End);
+                    PathState.FScores[NeighborIdx] = ThisGScore + _GetHeuristic(Neighbor, End);
 
-                    AddToOpenSet(&PathState, NeighborIdx);
+                    _AddToOpenSet(&PathState, NeighborIdx);
                 }
             }
         }
-
-#ifdef VIZ
-        if (VizGen >= VizGenMax)
-        {
-            int I = 0;
-            int PrevIdx = CurrentIdx;
-            while (PrevIdx != StartIdx && I < PATH_MAX)
-            {
-                DrawRect(World, IdxToXY(PrevIdx, World->Width), I == 0 ? ColorAlpha(VA_YELLOW, 200) : ColorAlpha(VA_BLUE, 100));
-                I++;
-                PrevIdx = PathState.CameFrom[PrevIdx];
-            }
-            DrawRect(World, Start, ColorAlpha(VA_RED, 200));
-
-            goto routine_end;
-        }
-        VizGen++;
-#endif
-
-        if (IterationCount++ > MaxIterations) break;
     }
 
     Result.FoundPath = FoundPath;
-    
+
     if (FoundPath)
     {
         Result.Path = MemoryArena_PushArray(ResultArena, PATH_MAX, vec2i);
@@ -246,9 +223,6 @@ CalculatePath(world *World, vec2i Start, vec2i End, memory_arena *TrArena, memor
         MemoryArena_ResizePreviousPushArray(ResultArena, Count, vec2i);
     }
 
-#ifdef VIZ
- routine_end:
-#endif
     MemoryArena_Unfreeze(TrArena);
 
     return Result;

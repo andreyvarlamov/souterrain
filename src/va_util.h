@@ -3,7 +3,7 @@
 
 #define static_g static
 #define static_p static
-#define static_i static
+#define internal_func static
 
 #ifdef SAV_DEBUG
   void __debugbreak(); // usually in <intrin.h>

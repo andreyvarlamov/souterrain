@@ -10,9 +10,9 @@
 
 - Pathfinding is slow
 
-- To simplify code I want to make a lot of world gen code easily optional
-
 - Make sense of ground generation
+
+- Bring back the turn priority queue
 
 # Features to do:
 
