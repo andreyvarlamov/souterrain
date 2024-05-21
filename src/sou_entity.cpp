@@ -1,5 +1,8 @@
 #include "sou_entity.h"
 
+#include "va_common.h"
+#include "sou_turn_queue.h"
+
 entity *
 GetEntitiesAt(vec2i P, world *World)
 {
@@ -230,6 +233,8 @@ AddEntity(world *World, vec2i Pos, entity *CopyEntity, b32 NeedFOV)
         Entity->HealthData.RightArm.Current = Entity->HealthData.RightArm.Max = 100.0f;
         Entity->HealthData.LeftLeg.Current = Entity->HealthData.LeftLeg.Max = 100.0f;
         Entity->HealthData.RightLeg.Current = Entity->HealthData.RightLeg.Max = 100.0f;
+
+        TurnQueueInsertEntity(&World->TurnQueue, Entity, 100);
     }
 
     AddEntityToSpatial(World, Pos, Entity);
@@ -241,6 +246,8 @@ void
 DeleteEntity(world *World, entity *Entity)
 {
     RemoveEntityFromSpatial(World, Entity->Pos, Entity);
+
+    TurnQueueRemoveEntity(&World->TurnQueue, Entity);
 
     Entity->Type = ENTITY_NONE;
     
@@ -267,27 +274,6 @@ ValidateEntitySpatialPartition(world *World)
     }
 
     return true;
-}
-
-void
-CopyEntity(entity *From, entity *To, world *ToWorld)
-{
-    To->Type = From->Type;
-    To->Flags = From->Flags;
-    
-    To->Glyph = From->Glyph;
-    To->Color = From->Color;
-
-    To->ViewRange = From->ViewRange;
-
-    Assert(To->FieldOfView || !From->FieldOfView);
-    // NOTE: No need to copy of fov as it's world specific
-
-    To->NpcState = From->NpcState;
-    To->Target = From->Target;
-
-    To->Name = From->Name;
-    To->Description = From->Description;
 }
 
 b32

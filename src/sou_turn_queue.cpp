@@ -1,6 +1,18 @@
 #include "sou_turn_queue.h"
 
-turn_queue
+#include "va_common.h"
+#include "sou_entity.h"
+
+struct turn_queue_node
+{
+    entity *Entity;
+    int TicksToAct;
+
+    turn_queue_node *Previous;
+    turn_queue_node *Next;
+};
+
+internal_func turn_queue
 TurnQueueMake(memory_arena *Arena, int NodeMax)
 {
     turn_queue TurnQueue = {};
@@ -9,8 +21,8 @@ TurnQueueMake(memory_arena *Arena, int NodeMax)
     return TurnQueue;
 }
 
-turn_queue_node *
-TurnQueueGetFreeNode(turn_queue *TurnQueue)
+internal_func inline turn_queue_node *
+_TurnQueueGetFreeNode(turn_queue *TurnQueue)
 {
     turn_queue_node *FreeNode = TurnQueue->NextFreeNode;
     if (FreeNode != NULL)
@@ -27,15 +39,25 @@ TurnQueueGetFreeNode(turn_queue *TurnQueue)
     return FreeNode;
 }
 
-void
-TurnQueueDeleteNode(turn_queue *TurnQueue, turn_queue_node *Node)
+internal_func inline void
+_TurnQueueDeleteNode(turn_queue *TurnQueue, turn_queue_node *Node)
 {
-    // TODO: Error here (if Previous or Nest is null)
     turn_queue_node *Previous = Node->Previous;
     turn_queue_node *Next = Node->Next;
 
-    Previous->Next = Next;
-    Next->Previous = Previous;
+    if (Previous == NULL)
+    {
+        TurnQueue->NextNode = Next;
+    }
+    else
+    {
+        Previous->Next = Next;
+    }
+
+    if (Next != NULL)
+    {
+        Next->Previous = Previous;
+    }
 
     *Node = {};
 
@@ -43,7 +65,7 @@ TurnQueueDeleteNode(turn_queue *TurnQueue, turn_queue_node *Node)
     TurnQueue->NextFreeNode = Node;
 }
 
-inline void
+internal_func inline void
 _TurnQueueInsertNode(turn_queue *TurnQueue, turn_queue_node *NodeToInsert)
 {
     turn_queue_node *PreviousNode = NULL;
@@ -86,17 +108,55 @@ _TurnQueueInsertNode(turn_queue *TurnQueue, turn_queue_node *NodeToInsert)
     }
 }
 
-void
+internal_func void
 TurnQueueInsertEntity(turn_queue *TurnQueue, entity *Entity, int TicksToAct)
 {
-    turn_queue_node *NodeToInsert = TurnQueueGetFreeNode(TurnQueue);
+    turn_queue_node *NodeToInsert = _TurnQueueGetFreeNode(TurnQueue);
     NodeToInsert->Entity = Entity;
     NodeToInsert->TicksToAct = TicksToAct;
 
     _TurnQueueInsertNode(TurnQueue, NodeToInsert);
 }
 
-int
+internal_func void
+TurnQueueRemoveEntity(turn_queue *TurnQueue, entity *Entity)
+{
+    turn_queue_node *Current = TurnQueue->NextNode;
+    while (Current)
+    {
+        if (Current->Entity == Entity)
+        {
+            _TurnQueueDeleteNode(TurnQueue, Current);
+            // TODO: Remove this if same entity can be in queue multiple times
+            return;
+        }
+
+        Current = Current->Next;
+    }
+
+    InvalidCodePath; // NOTE: Entity not in the queue was attempted to be removed
+}
+
+internal_func entity *
+TurnQueuePopEntity(turn_queue *TurnQueue)
+{
+    turn_queue_node *TopNode = TurnQueue->NextNode;
+    Assert(TopNode->TicksToAct == 0);
+
+    entity *TopEntity = TopNode->Entity;
+
+    _TurnQueueDeleteNode(TurnQueue, TopNode);
+
+    return TopEntity;
+}
+
+internal_func entity *
+TurnQueuePeekEntity(turn_queue *TurnQueue)
+{
+    return TurnQueue->NextNode->Entity;
+}
+
+internal_func int
 TurnQueueAdvanceTicks(turn_queue *TurnQueue)
 {
     turn_queue_node *TopNode = TurnQueue->NextNode;
@@ -114,23 +174,4 @@ TurnQueueAdvanceTicks(turn_queue *TurnQueue)
     }
 
     return TicksToAdvance;
-}
-
-entity *
-TurnQueuePeekEntity(turn_queue *TurnQueue)
-{
-    return TurnQueue->NextNode->Entity;
-}
-
-entity *
-TurnQueuePopEntity(turn_queue *TurnQueue)
-{
-    turn_queue_node *TopNode = TurnQueue->NextNode;
-    Assert(TopNode->TicksToAct == 0);
-
-    entity *TopEntity = TopNode->Entity;
-
-    TurnQueueDeleteNode(TurnQueue, TopNode);
-
-    return TopEntity;
 }
